@@ -13,19 +13,30 @@ type AuthContextType = {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+// === INIZIO MODIFICA ===
+// Questa funzione ora usa un 'fetch' standard per gestire
+// l'errore 401 in modo specifico, senza far scattare il
+// gestore di errori globale in queryClient.ts.
 async function fetchUser(): Promise<SafeUser | null> {
-  try {
-    const res = await apiRequest("GET", "/api/auth/me");
-    return await res.json();
-  } catch (error: any) {
-    if (error.message.startsWith('401')) {
-      console.log("Nessun utente loggato.");
-    } else {
-      console.error("Errore nel fetchUser:", error.message);
-    }
+  const res = await fetch("/api/auth/me", {
+    credentials: "include", // Non dimenticare i cookie!
+  });
+
+  if (res.status === 401) {
+    // Questo è un caso NORMALE. Significa solo che l'utente non è loggato.
+    // Restituiamo null per farlo sapere a useQuery.
     return null;
   }
+
+  if (!res.ok) {
+    // Questo è un VERO errore (es. 500)
+    throw new Error("Errore del server durante la verifica dell'autenticazione");
+  }
+
+  // L'utente è loggato, restituiamo i dati
+  return await res.json();
 }
+// === FINE MODIFICA ===
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient();
@@ -33,29 +44,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   
   const { data: user, isLoading } = useQuery({
     queryKey: ["/api/auth/me"],
-    queryFn: fetchUser,
-    staleTime: Infinity, // I dati dell'utente sono considerati stabili
-    retry: false, // Non tentare di nuovo se fallisce (significa solo che non è loggato)
-    refetchOnWindowFocus: true, // Ricontrolla se l'utente è ancora loggato
+    queryFn: fetchUser, // Usa la nostra funzione modificata
+    staleTime: Infinity, 
+    retry: false, 
+    refetchOnWindowFocus: true,
   });
 
   const login = (loggedInUser: SafeUser) => {
-    // Aggiorna la cache di /api/auth/me per evitare una chiamata inutile
     queryClient.setQueryData(["/api/auth/me"], loggedInUser);
-    setLocation("/"); // Reindirizza alla home
+    setLocation("/"); 
   };
 
   const logout = async () => {
     try {
       await apiRequest("POST", "/api/auth/logout");
     } catch (error) {
-      console.error("Errore durante il logout:", error);
+      console.error("Errore during logout:", error);
     } finally {
-      // Invalida tutte le query e resetta la cache
       queryClient.clear();
-      // Assicura che anche la query /api/auth/me sia pulita
       queryClient.setQueryData(["/api/auth/me"], null);
-      setLocation("/login"); // Reindirizza al login
+      setLocation("/login"); 
     }
   };
 

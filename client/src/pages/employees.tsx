@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import EmployeeCard from "@/components/ui/data-display/EmployeeCard";
-import EmployeeModal from "@/components/ui/modals/EmployeeModal";
+import { EmployeeModal } from "@/components/ui/modals/EmployeeModal";
 import ConfirmDeleteModal from "@/components/ui/modals/ConfirmDeleteModal";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";

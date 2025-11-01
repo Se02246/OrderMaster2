@@ -112,8 +112,6 @@ export function ApartmentModal({
       const method = mode === "edit" ? "PUT" : "POST";
       return apiRequest(method, url, values);
     },
-    
-    // === INIZIO MODIFICA ===
     onSuccess: () => {
       toast({
         title: `Ordine ${mode === "edit" ? "aggiornato" : "creato"}`,
@@ -121,40 +119,29 @@ export function ApartmentModal({
           mode === "edit" ? "aggiornato" : "creato"
         } con successo.`,
       });
-      
       // Invalida tutte le query relative per aggiornare l'interfaccia
-      // Usiamo 'predicate' per invalidare tutte le query che *iniziano con* quel percorso,
-      // così da includere anche quelle con filtri (es. /api/apartments?sortBy=...)
-      
       queryClient.invalidateQueries({ 
         predicate: (query) => 
           typeof query.queryKey[0] === 'string' && 
           query.queryKey[0].startsWith('/api/apartments') 
       });
-      
       queryClient.invalidateQueries({ 
         predicate: (query) => 
           typeof query.queryKey[0] === 'string' && 
           query.queryKey[0].startsWith('/api/calendar') 
       });
-      
       queryClient.invalidateQueries({ 
         predicate: (query) => 
           typeof query.queryKey[0] === 'string' && 
           query.queryKey[0].startsWith('/api/statistics') 
       });
-
-      // Aggiunto per aggiornare lo stato dei clienti (visto che un ordine è stato modificato)
       queryClient.invalidateQueries({ 
         predicate: (query) => 
           typeof query.queryKey[0] === 'string' && 
           query.queryKey[0].startsWith('/api/employees') 
       });
-      
       onClose();
     },
-    // === FINE MODIFICA ===
-    
     onError: (error: any) => {
       toast({
         title: "Errore",
@@ -195,7 +182,8 @@ export function ApartmentModal({
                     <FormItem>
                       <FormLabel>Nome Ordine</FormLabel>
                       <FormControl>
-                        <Input placeholder="Es. Appartamento 101" {...field} />
+                        {/* === MODIFICA 1: Placeholder rimosso === */}
+                        <Input {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -224,13 +212,14 @@ export function ApartmentModal({
                   name="cleaning_date"
                   render={({ field }) => (
                     <FormItem className="flex flex-col pt-2">
-                      <FormLabel>Data Pulizia</FormLabel>
+                      {/* === MODIFICA 2: Label cambiata === */}
+                      <FormLabel>Data</FormLabel>
                       <Popover>
                         <PopoverTrigger asChild>
                           <FormControl>
                             <Button
                               variant={"outline"}
-                              className={cn(
+                              className={cn( 
                                 "pl-3 text-left font-normal",
                                 !field.value && "text-muted-foreground"
                               )} 
@@ -265,7 +254,8 @@ export function ApartmentModal({
                   name="start_time"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Ora Inizio</FormLabel>
+                      {/* === MODIFICA 3: Label cambiata === */}
+                      <FormLabel>Ora</FormLabel>
                       <FormControl>
                         <Input type="time" {...field} />
                       </FormControl>
@@ -364,7 +354,8 @@ export function ApartmentModal({
                             <ToggleGroupItem
                               key={employee.id}
                               value={String(employee.id)} 
-                              className="flex gap-2"
+                              // === MODIFICA 4: Stile per selezione ===
+                              className="flex gap-2 data-[state=on]:bg-primary data-[state=on]:text-primary-foreground data-[state=on]:hover:bg-primary/90"
                               aria-label={`Toggle ${employee.first_name}`}
                             >
                               <User className="h-4 w-4" />

@@ -57,12 +57,17 @@ app.use((req, res, next) => {
     serveStatic(app);
   }
 
-  const port = 5000;
+  // === MODIFICA CHIAVE ===
+  // Usa la porta fornita da Render (process.env.PORT)
+  // o torna a 5000 se non è definita (per lo sviluppo locale)
+  const port = process.env.PORT || 5000;
+  // === FINE ===
+  
   server.listen({
     port,
-    host: "0.0.0.0",
+    host: "0.0.0.0", // Ascolta su tutti gli indirizzi IP (necessario per Render)
     reusePort: true,
   }, () => {
-    log(`serving on port ${port}`);
+    log(`serving on port ${port}`); // Registrerà la porta corretta usata
   });
 })();

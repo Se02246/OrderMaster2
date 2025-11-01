@@ -1,24 +1,114 @@
-import express, { type Express, Request, Response } from "express";
+import express, { type Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { z } from "zod";
 import { 
   insertApartmentSchema, 
   insertEmployeeSchema, 
-  apartmentWithEmployeesSchema 
+  apartmentWithEmployeesSchema,
+  insertUserSchema,
+  SafeUser,
+  users,
 } from "@shared/schema";
 import { fromZodError } from "zod-validation-error";
+import { isAuthenticated } from "./middleware";
+import passport from "passport";
+import bcrypt from "bcryptjs";
+import { db } from "./db";
+import { eq } from "drizzle-orm";
+
+// Helper per ottenere l'ID utente in modo sicuro
+function getUserId(req: Request): number {
+  const user = req.user as SafeUser;
+  if (!user || !user.id) {
+    throw new Error("Autenticazione richiesta");
+  }
+  return user.id;
+}
 
 export async function registerRoutes(app: Express): Promise<Server> {
   const router = express.Router();
+  const authRouter = express.Router();
+
+  // === Route di Autenticazione (Pubbliche) ===
+
+  authRouter.post("/register", async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { email, password } = req.body;
+      if (!email || !password) {
+        return res.status(400).json({ message: "Email e password sono obbligatori." });
+      }
+
+      const [existingUser] = await db.select().from(users).where(eq(users.email, email)).limit(1);
+      if (existingUser) {
+        return res.status(400).json({ message: "Email già registrata." });
+      }
+
+      const hashedPassword = await bcrypt.hash(password, 10);
+      const validationResult = insertUserSchema.safeParse({
+        email,
+        hashed_password: hashedPassword,
+      });
+
+      if (!validationResult.success) {
+        const errorMessage = fromZodError(validationResult.error).message;
+        return res.status(400).json({ message: errorMessage });
+      }
+
+      const [newUser] = await db.insert(users).values(validationResult.data).returning();
+      const { hashed_password, ...safeUser } = newUser;
+      
+      req.login(safeUser, (err) => {
+        if (err) return next(err);
+        res.status(201).json(safeUser);
+      });
+
+    } catch (error) {
+      console.error("Error registering user:", error);
+      res.status(500).json({ message: "Error registering user" });
+    }
+  });
+
+  authRouter.post("/login", passport.authenticate("local"), (req: Request, res: Response) => {
+    // Se la funzione viene chiamata, l'autenticazione ha avuto successo.
+    // req.user contiene l'utente (impostato da passport.deserializeUser)
+    res.json(req.user);
+  });
+
+  authRouter.post("/logout", (req: Request, res: Response, next: NextFunction) => {
+    req.logout((err) => {
+      if (err) return next(err);
+      req.session.destroy(() => {
+        res.clearCookie("connect.sid");
+        res.status(200).json({ message: "Logout effettuato con successo." });
+      });
+    });
+  });
+
+  authRouter.get("/me", (req: Request, res: Response) => {
+    // Questa route controlla se la sessione è valida
+    if (req.isAuthenticated()) {
+      res.json(req.user);
+    } else {
+      res.status(401).json({ message: "Non autenticato" });
+    }
+  });
+
+  app.use("/api/auth", authRouter);
+
+  // === Route API Protette ===
+  
+  // Da qui in poi, tutte le route in /api/* richiederanno il login
+  router.use(isAuthenticated);
 
   // Apartments endpoints
   router.get("/apartments", async (req: Request, res: Response) => {
     try {
+      const userId = getUserId(req);
       const sortBy = req.query.sortBy as string | undefined;
       const search = req.query.search as string | undefined;
       
-      const apartments = await storage.getApartments({ sortBy, search });
+      const apartments = await storage.getApartments(userId, { sortBy, search });
       res.json(apartments);
     } catch (error) {
       console.error("Error fetching apartments:", error);
@@ -28,12 +118,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   router.get("/apartments/:id", async (req: Request, res: Response) => {
     try {
+      const userId = getUserId(req);
       const id = parseInt(req.params.id);
       if (isNaN(id)) {
         return res.status(400).json({ message: "Invalid apartment ID" });
       }
       
-      const apartment = await storage.getApartment(id);
+      const apartment = await storage.getApartment(userId, id);
       if (!apartment) {
         return res.status(404).json({ message: "Apartment not found" });
       }
@@ -47,6 +138,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   router.post("/apartments", async (req: Request, res: Response) => {
     try {
+      const userId = getUserId(req);
       const validationResult = apartmentWithEmployeesSchema.safeParse(req.body);
       
       if (!validationResult.success) {
@@ -57,7 +149,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { employee_ids, ...apartmentData } = validationResult.data;
       
       const apartment = await storage.createApartment(
-        apartmentData, 
+        userId,
+        { ...apartmentData, user_id: userId }, // Assicura che user_id sia impostato
         employee_ids || []
       );
       
@@ -70,6 +163,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   router.put("/apartments/:id", async (req: Request, res: Response) => {
     try {
+      const userId = getUserId(req);
       const id = parseInt(req.params.id);
       if (isNaN(id)) {
         return res.status(400).json({ message: "Invalid apartment ID" });
@@ -85,8 +179,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { employee_ids, ...apartmentData } = validationResult.data;
       
       const apartment = await storage.updateApartment(
+        userId,
         id,
-        apartmentData, 
+        { ...apartmentData, user_id: userId }, // Assicura che user_id sia impostato
         employee_ids || []
       );
       
@@ -99,12 +194,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   router.delete("/apartments/:id", async (req: Request, res: Response) => {
     try {
+      const userId = getUserId(req);
       const id = parseInt(req.params.id);
       if (isNaN(id)) {
         return res.status(400).json({ message: "Invalid apartment ID" });
       }
       
-      await storage.deleteApartment(id);
+      await storage.deleteApartment(userId, id);
       res.status(204).end();
     } catch (error) {
       console.error("Error deleting apartment:", error);
@@ -115,9 +211,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Employees endpoints
   router.get("/employees", async (req: Request, res: Response) => {
     try {
+      const userId = getUserId(req);
       const search = req.query.search as string | undefined;
       
-      const employees = await storage.getEmployees({ search });
+      const employees = await storage.getEmployees(userId, { search });
       res.json(employees);
     } catch (error) {
       console.error("Error fetching employees:", error);
@@ -127,12 +224,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   router.get("/employees/:id", async (req: Request, res: Response) => {
     try {
+      const userId = getUserId(req);
       const id = parseInt(req.params.id);
       if (isNaN(id)) {
         return res.status(400).json({ message: "Invalid employee ID" });
       }
       
-      const employee = await storage.getEmployee(id);
+      const employee = await storage.getEmployee(userId, id);
       if (!employee) {
         return res.status(404).json({ message: "Employee not found" });
       }
@@ -146,6 +244,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   router.post("/employees", async (req: Request, res: Response) => {
     try {
+      const userId = getUserId(req);
       const validationResult = insertEmployeeSchema.safeParse(req.body);
       
       if (!validationResult.success) {
@@ -153,7 +252,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: errorMessage });
       }
       
-      const employee = await storage.createEmployee(validationResult.data);
+      const employee = await storage.createEmployee(
+        userId,
+        { ...validationResult.data, user_id: userId } // Assicura user_id
+      );
       
       res.status(201).json(employee);
     } catch (error) {
@@ -164,12 +266,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   router.delete("/employees/:id", async (req: Request, res: Response) => {
     try {
+      const userId = getUserId(req);
       const id = parseInt(req.params.id);
       if (isNaN(id)) {
         return res.status(400).json({ message: "Invalid employee ID" });
       }
       
-      await storage.deleteEmployee(id);
+      await storage.deleteEmployee(userId, id);
       res.status(204).end();
     } catch (error) {
       console.error("Error deleting employee:", error);
@@ -180,6 +283,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Calendar endpoints
   router.get("/calendar/:year/:month", async (req: Request, res: Response) => {
     try {
+      const userId = getUserId(req);
       const year = parseInt(req.params.year);
       const month = parseInt(req.params.month);
       
@@ -187,7 +291,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Invalid year or month" });
       }
       
-      const apartments = await storage.getApartmentsByMonth(year, month);
+      const apartments = await storage.getApartmentsByMonth(userId, year, month);
       res.json(apartments);
     } catch (error) {
       console.error("Error fetching calendar data:", error);
@@ -197,6 +301,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   router.get("/calendar/:year/:month/:day", async (req: Request, res: Response) => {
     try {
+      const userId = getUserId(req);
       const year = parseInt(req.params.year);
       const month = parseInt(req.params.month);
       const day = parseInt(req.params.day);
@@ -206,7 +311,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Invalid date" });
       }
       
-      const apartments = await storage.getApartmentsByDate(year, month, day);
+      const apartments = await storage.getApartmentsByDate(userId, year, month, day);
       res.json(apartments);
     } catch (error) {
       console.error("Error fetching calendar day data:", error);
@@ -215,9 +320,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Statistics endpoint
-  router.get("/statistics", async (_req: Request, res: Response) => {
+  router.get("/statistics", async (req: Request, res: Response) => {
     try {
-      const stats = await storage.getStatistics();
+      const userId = getUserId(req);
+      const stats = await storage.getStatistics(userId);
       res.json(stats);
     } catch (error) {
       console.error("Error fetching statistics:", error);

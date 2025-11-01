@@ -112,6 +112,8 @@ export function ApartmentModal({
       const method = mode === "edit" ? "PUT" : "POST";
       return apiRequest(method, url, values);
     },
+    
+    // === INIZIO MODIFICA ===
     onSuccess: () => {
       toast({
         title: `Ordine ${mode === "edit" ? "aggiornato" : "creato"}`,
@@ -119,12 +121,40 @@ export function ApartmentModal({
           mode === "edit" ? "aggiornato" : "creato"
         } con successo.`,
       });
+      
       // Invalida tutte le query relative per aggiornare l'interfaccia
-      queryClient.invalidateQueries({ queryKey: ["/api/apartments"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/calendar"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/statistics"] });
+      // Usiamo 'predicate' per invalidare tutte le query che *iniziano con* quel percorso,
+      // così da includere anche quelle con filtri (es. /api/apartments?sortBy=...)
+      
+      queryClient.invalidateQueries({ 
+        predicate: (query) => 
+          typeof query.queryKey[0] === 'string' && 
+          query.queryKey[0].startsWith('/api/apartments') 
+      });
+      
+      queryClient.invalidateQueries({ 
+        predicate: (query) => 
+          typeof query.queryKey[0] === 'string' && 
+          query.queryKey[0].startsWith('/api/calendar') 
+      });
+      
+      queryClient.invalidateQueries({ 
+        predicate: (query) => 
+          typeof query.queryKey[0] === 'string' && 
+          query.queryKey[0].startsWith('/api/statistics') 
+      });
+
+      // Aggiunto per aggiornare lo stato dei clienti (visto che un ordine è stato modificato)
+      queryClient.invalidateQueries({ 
+        predicate: (query) => 
+          typeof query.queryKey[0] === 'string' && 
+          query.queryKey[0].startsWith('/api/employees') 
+      });
+      
       onClose();
     },
+    // === FINE MODIFICA ===
+    
     onError: (error: any) => {
       toast({
         title: "Errore",
@@ -200,10 +230,10 @@ export function ApartmentModal({
                           <FormControl>
                             <Button
                               variant={"outline"}
-                              className={cn( // Qui è dove ho tagliato il file l'ultima volta
+                              className={cn(
                                 "pl-3 text-left font-normal",
                                 !field.value && "text-muted-foreground"
-                              )} // La parentesi di chiusura mancava
+                              )} 
                             >
                               {field.value ? (
                                 format(new Date(field.value + "T00:00:00"), "PPP", { locale: it })
@@ -293,8 +323,6 @@ export function ApartmentModal({
                 />
               </div>
 
-              {/* === INIZIO PARTE CHE ERA MANCANTE === */}
-
               <Separator />
 
               {/* Sezione Clienti (Dipendenti) */}
@@ -322,7 +350,6 @@ export function ApartmentModal({
                           variant="outline"
                           className="flex-wrap justify-start p-4"
                           
-                          // Logica di conversione robusta
                           value={Array.isArray(field.value) ? field.value.map(String) : []}
                           
                           onValueChange={(value: string[]) => {
@@ -336,7 +363,7 @@ export function ApartmentModal({
                           {employees?.map((employee) => (
                             <ToggleGroupItem
                               key={employee.id}
-                              value={String(employee.id)} // Il valore deve essere una stringa
+                              value={String(employee.id)} 
                               className="flex gap-2"
                               aria-label={`Toggle ${employee.first_name}`}
                             >
@@ -392,7 +419,6 @@ export function ApartmentModal({
         onClose={() => setIsEmployeeModalOpen(false)}
         onSuccess={onEmployeeCreated}
       />
-      {/* === FINE PARTE CHE ERA MANCANTE === */}
     </>
   );
 }

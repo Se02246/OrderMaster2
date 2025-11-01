@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useParams, Link } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import ApartmentCard from "@/components/ui/data-display/ApartmentCard";
-import ApartmentModal from "@/components/ui/modals/ApartmentModal";
+import { ApartmentModal } from "@/components/ui/modals/ApartmentModal";
 import ConfirmDeleteModal from "@/components/ui/modals/ConfirmDeleteModal";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";

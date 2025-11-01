@@ -31,7 +31,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   const authRouter = express.Router();
 
   // === Route di Autenticazione (Pubbliche) ===
-
+  // ... (nessuna modifica qui)
   authRouter.post("/register", async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { email, password } = req.body;
@@ -70,8 +70,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   authRouter.post("/login", passport.authenticate("local"), (req: Request, res: Response) => {
-    // Se la funzione viene chiamata, l'autenticazione ha avuto successo.
-    // req.user contiene l'utente (impostato da passport.deserializeUser)
     res.json(req.user);
   });
 
@@ -86,7 +84,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   authRouter.get("/me", (req: Request, res: Response) => {
-    // Questa route controlla se la sessione è valida
     if (req.isAuthenticated()) {
       res.json(req.user);
     } else {
@@ -98,7 +95,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // === Route API Protette ===
   
-  // Da qui in poi, tutte le route in /api/* richiederanno il login
   router.use(isAuthenticated);
 
   // Apartments endpoints
@@ -142,15 +138,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const validationResult = apartmentWithEmployeesSchema.safeParse(req.body);
       
       if (!validationResult.success) {
+        // === INIZIO MODIFICA ===
+        // Aggiungiamo un fallback: se 'errorMessage' è undefined,
+        // invia un messaggio generico.
         const errorMessage = fromZodError(validationResult.error).message;
-        return res.status(400).json({ message: errorMessage });
+        return res.status(400).json({ message: errorMessage || "Dati non validi." });
+        // === FINE MODIFICA ===
       }
       
+      // validationResult.data ora conterrà 'employee_ids' come number[]
+      // grazie alla coercizione in shared/schema.ts
       const { employee_ids, ...apartmentData } = validationResult.data;
       
       const apartment = await storage.createApartment(
         userId,
-        { ...apartmentData, user_id: userId }, // Assicura che user_id sia impostato
+        { ...apartmentData, user_id: userId }, 
         employee_ids || []
       );
       
@@ -172,8 +174,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const validationResult = apartmentWithEmployeesSchema.safeParse(req.body);
       
       if (!validationResult.success) {
+        // === INIZIO MODIFICA (Come sopra) ===
         const errorMessage = fromZodError(validationResult.error).message;
-        return res.status(400).json({ message: errorMessage });
+        return res.status(400).json({ message: errorMessage || "Dati non validi." });
+        // === FINE MODIFICA ===
       }
       
       const { employee_ids, ...apartmentData } = validationResult.data;
@@ -181,7 +185,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const apartment = await storage.updateApartment(
         userId,
         id,
-        { ...apartmentData, user_id: userId }, // Assicura che user_id sia impostato
+        { ...apartmentData, user_id: userId }, 
         employee_ids || []
       );
       
@@ -248,13 +252,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const validationResult = insertEmployeeSchema.safeParse(req.body);
       
       if (!validationResult.success) {
+        // === INIZIO MODIFICA (Come sopra) ===
         const errorMessage = fromZodError(validationResult.error).message;
-        return res.status(400).json({ message: errorMessage });
+        return res.status(400).json({ message: errorMessage || "Dati non validi." });
+        // === FINE MODIFICA ===
       }
       
       const employee = await storage.createEmployee(
         userId,
-        { ...validationResult.data, user_id: userId } // Assicura user_id
+        { ...validationResult.data, user_id: userId } 
       );
       
       res.status(201).json(employee);

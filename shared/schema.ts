@@ -4,14 +4,12 @@ import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 import { relations } from "drizzle-orm";
 
-// Users table
+// --- Tabelle (Nessuna modifica) ---
 export const users = pgTable("users", {
   id: serial("id").primaryKey(),
   email: varchar("email", { length: 255 }).notNull().unique(),
   hashed_password: text("hashed_password").notNull(),
 });
-
-// Apartments table
 export const apartments = pgTable("apartments", {
   id: serial("id").primaryKey(),
   name: varchar("name", { length: 255 }).notNull(),
@@ -23,16 +21,12 @@ export const apartments = pgTable("apartments", {
   price: numeric("price", { precision: 10, scale: 2 }),
   user_id: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
 });
-
-// Employees table
 export const employees = pgTable("employees", {
   id: serial("id").primaryKey(),
   first_name: varchar("first_name", { length: 100 }).notNull(),
   last_name: varchar("last_name", { length: 100 }).notNull(),
   user_id: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
 });
-
-// Assignments table (bridge table for many-to-many relationship)
 export const assignments = pgTable("assignments", {
   id: serial("id").primaryKey(),
   apartment_id: integer("apartment_id").notNull().references(() => apartments.id, { onDelete: "cascade" }),
@@ -42,13 +36,11 @@ export const assignments = pgTable("assignments", {
     uniqueIdx: primaryKey({ columns: [table.apartment_id, table.employee_id] }),
   };
 });
-
-// Define relations
+// --- Relazioni (Nessuna modifica) ---
 export const usersRelations = relations(users, ({ many }) => ({
   apartments: many(apartments),
   employees: many(employees),
 }));
-
 export const apartmentsRelations = relations(apartments, ({ one, many }) => ({
   user: one(users, {
     fields: [apartments.user_id],
@@ -56,7 +48,6 @@ export const apartmentsRelations = relations(apartments, ({ one, many }) => ({
   }),
   assignments: many(assignments)
 }));
-
 export const employeesRelations = relations(employees, ({ one, many }) => ({
   user: one(users, {
     fields: [employees.user_id],
@@ -64,7 +55,6 @@ export const employeesRelations = relations(employees, ({ one, many }) => ({
   }),
   assignments: many(assignments)
 }));
-
 export const assignmentsRelations = relations(assignments, ({ one }) => ({
   apartment: one(apartments, {
     fields: [assignments.apartment_id],
@@ -76,13 +66,13 @@ export const assignmentsRelations = relations(assignments, ({ one }) => ({
   })
 }));
 
-// Insert schemas
+// --- Schemi di Inserimento (Nessuna modifica) ---
 export const insertUserSchema = createInsertSchema(users).omit({ id: true });
 export const insertApartmentSchema = createInsertSchema(apartments).omit({ id: true, user_id: true });
 export const insertEmployeeSchema = createInsertSchema(employees).omit({ id: true, user_id: true });
 export const insertAssignmentSchema = createInsertSchema(assignments).omit({ id: true });
 
-// Types
+// --- Tipi (Nessuna modifica) ---
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type Apartment = typeof apartments.$inferSelect;
@@ -92,35 +82,29 @@ export type InsertEmployee = z.infer<typeof insertEmployeeSchema>;
 export type Assignment = typeof assignments.$inferSelect;
 export type InsertAssignment = z.infer<typeof insertAssignmentSchema>;
 
-// Extended schemas for API operations
+// --- Schemi Estesi (QUI C'È LA MODIFICA) ---
 export const apartmentWithEmployeesSchema = z.object({
   ...insertApartmentSchema.shape,
   price: z.union([z.string(), z.number()]).optional().nullable(),
   
   // === INIZIO MODIFICA ===
-  // Creiamo una "pipe" di validazione robusta per gli ID dei dipendenti
+  // Torniamo a uno schema semplice e pulito. 
+  // Ci aspettiamo un array di numeri. Punto.
+  // Il lavoro di conversione sarà fatto al 100% nel componente del form.
   employee_ids: z.array(
-    // 1. Diciamo che l'input può essere stringa o numero
-    z.union([z.string(), z.number()])
-    // 2. Usiamo .transform() per convertire tutto in numero
-    .transform((val) => parseInt(String(val), 10))
-    // 3. Ci assicuriamo che il risultato sia un numero valido (non NaN)
-    //    e impostiamo un messaggio di errore chiaro.
-    .pipe(z.number({ invalid_type_error: "ID cliente non valido" }).min(1, "ID cliente non valido"))
-  ).optional()
+    z.number({ invalid_type_error: "ID cliente deve essere un numero." })
+     .min(1, "ID cliente non valido.")
+  ).optional(),
   // === FINE MODIFICA ===
 });
 
 export type ApartmentWithEmployees = z.infer<typeof apartmentWithEmployeesSchema>;
 
-// Extended types for API responses
+// --- Tipi Estesi (Nessuna modifica) ---
 export type ApartmentWithAssignedEmployees = Apartment & {
   employees: Employee[];
 };
-
 export type EmployeeWithAssignedApartments = Employee & {
   apartments: Apartment[];
 };
-
-// Simple User type for frontend
 export type SafeUser = Omit<User, "hashed_password">;

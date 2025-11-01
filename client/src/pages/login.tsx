@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useAuth } from "@/contexts/AuthContext";
+// useAuth non viene più usato qui per una funzione 'login'
 import { apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -26,7 +26,7 @@ type LoginFormValues = z.infer<typeof loginSchema>;
 type RegisterFormValues = z.infer<typeof registerSchema>;
 
 export default function LoginPage() {
-  const { login } = useAuth();
+  // const { login } = useAuth(); // Rimosso: la funzione login non esiste in AuthContext
   const { toast } = useToast();
   const [isLoginPending, setIsLoginPending] = useState(false);
   const [isRegisterPending, setIsRegisterPending] = useState(false);
@@ -44,9 +44,17 @@ export default function LoginPage() {
   const onLoginSubmit = async (data: LoginFormValues) => {
     setIsLoginPending(true);
     try {
-      const res = await apiRequest("POST", "/api/auth/login", data);
-      const user = (await res.json()) as SafeUser;
-      login(user); // Aggiorna il contesto di autenticazione
+      // === INIZIO MODIFICA ===
+      // 1. apiRequest ora restituisce direttamente i dati JSON (l'utente)
+      // Rimuoviamo la chiamata .json()
+      const user = await apiRequest<SafeUser>("POST", "/api/auth/login", data);
+      
+      // 2. AuthContext non ha una funzione 'login'.
+      // La chiamata API imposta il cookie di sessione.
+      // Dobbiamo solo reindirizzare alla home.
+      window.location.href = "/"; 
+      // === FINE MODIFICA ===
+
       toast({ title: "Accesso effettuato", description: `Bentornato, ${user.email}!` });
     } catch (error: any) {
       toast({
@@ -61,9 +69,15 @@ export default function LoginPage() {
   const onRegisterSubmit = async (data: RegisterFormValues) => {
     setIsRegisterPending(true);
     try {
-      const res = await apiRequest("POST", "/api/auth/register", data);
-      const user = (await res.json()) as SafeUser;
-      login(user); // Aggiorna il contesto e fa il login automatico
+      // === INIZIO MODIFICA ===
+      // 1. apiRequest ora restituisce direttamente i dati JSON (l'utente)
+      const user = await apiRequest<SafeUser>("POST", "/api/auth/register", data);
+      
+      // 2. Reindirizziamo alla home. AuthContext gestirà il fetch dell'utente
+      // al caricamento della pagina.
+      window.location.href = "/";
+      // === FINE MODIFICA ===
+
       toast({ title: "Registrazione completata", description: `Benvenuto, ${user.email}!` });
     } catch (error: any) {
       toast({

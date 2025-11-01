@@ -1,6 +1,17 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
 
-export const queryClient = new QueryClient();
+// === INIZIO MODIFICA ===
+// La 'getQueryFn' è definita più in basso in questo stesso file.
+// La passiamo qui nel costruttore per impostarla come predefinita
+// per tutte le 'useQuery'.
+export const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      queryFn: getQueryFn,
+    },
+  },
+});
+// === FINE MODIFICA ===
 
 /**
  * Gestore centralizzato degli errori per le risposte fetch.
@@ -13,7 +24,7 @@ async function throwIfResNotOk(res: Response) {
 
     // Logica di reindirizzamento 401 rimossa da qui per prevenire loop.
     // Sarà gestita dall'onError di useQuery in AuthContext.
-    
+
     throw new Error(`${res.status}: ${message}`);
   }
 }
@@ -22,7 +33,6 @@ async function throwIfResNotOk(res: Response) {
  * Funzione generica per le query (GET) usata da useQuery.
  */
 export const getQueryFn: QueryFunction = async ({ queryKey }) => {
-  // === INIZIO MODIFICA ===
   // queryKey[0] è l'URL base (es. "/api/apartments")
   // queryKey[1] (se esiste) è un oggetto di parametri (es. { sortBy: "name" })
 
@@ -32,9 +42,13 @@ export const getQueryFn: QueryFunction = async ({ queryKey }) => {
   // Costruiamo l'URL in modo sicuro, aggiungendo i parametri di ricerca
   const url = new URL(baseUrl, window.location.origin);
   if (params) {
-    Object.keys(params).forEach(key => {
+    Object.keys(params).forEach((key) => {
       // Aggiungi il parametro solo se ha un valore
-      if (params[key] !== undefined && params[key] !== null && params[key] !== "") {
+      if (
+        params[key] !== undefined &&
+        params[key] !== null &&
+        params[key] !== ""
+      ) {
         url.searchParams.append(key, params[key]);
       }
     });
@@ -42,8 +56,7 @@ export const getQueryFn: QueryFunction = async ({ queryKey }) => {
 
   // La vecchia versione (queryKey.join('/')) non funzionava con oggetti
   const res = await fetch(url.toString());
-  // === FINE MODIFICA ===
-  
+
   await throwIfResNotOk(res);
   return res.json();
 };
@@ -55,9 +68,8 @@ export const getQueryFn: QueryFunction = async ({ queryKey }) => {
 export async function apiRequest<T>(
   method: "POST" | "PUT" | "DELETE",
   url: string,
-  body?: unknown
+  body?: unknown,
 ): Promise<T> {
-  
   const options: RequestInit = {
     method,
     headers: {

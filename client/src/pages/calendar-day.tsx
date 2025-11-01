@@ -51,10 +51,27 @@ export default function CalendarDay() {
       apiRequest('POST', '/api/apartments', data),
     onSuccess: () => {
       // --- INIZIO MODIFICA ---
-      queryClient.invalidateQueries({ queryKey: ['/api/apartments'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/calendar'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/employees'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/statistics'] });
+      // === Correzione: usiamo predicate per createApartmentMutation ===
+      queryClient.invalidateQueries({ 
+        predicate: (query) => 
+          typeof query.queryKey[0] === 'string' && 
+          query.queryKey[0].startsWith('/api/apartments') 
+      });
+      queryClient.invalidateQueries({ 
+        predicate: (query) => 
+          typeof query.queryKey[0] === 'string' && 
+          query.queryKey[0].startsWith('/api/calendar') 
+      });
+      queryClient.invalidateQueries({ 
+        predicate: (query) => 
+          typeof query.queryKey[0] === 'string' && 
+          query.queryKey[0].startsWith('/api/employees') 
+      });
+      queryClient.invalidateQueries({ 
+        predicate: (query) => 
+          typeof query.queryKey[0] === 'string' && 
+          query.queryKey[0].startsWith('/api/statistics') 
+      });
       // --- FINE MODIFICA ---
       toast({
         title: "Successo",
@@ -77,10 +94,27 @@ export default function CalendarDay() {
       apiRequest('PUT', `/api/apartments/${id}`, data),
     onSuccess: () => {
       // --- INIZIO MODIFICA ---
-      queryClient.invalidateQueries({ queryKey: ['/api/apartments'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/calendar'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/employees'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/statistics'] });
+      // === Correzione: usiamo predicate per updateApartmentMutation ===
+      queryClient.invalidateQueries({ 
+        predicate: (query) => 
+          typeof query.queryKey[0] === 'string' && 
+          query.queryKey[0].startsWith('/api/apartments') 
+      });
+      queryClient.invalidateQueries({ 
+        predicate: (query) => 
+          typeof query.queryKey[0] === 'string' && 
+          query.queryKey[0].startsWith('/api/calendar') 
+      });
+      queryClient.invalidateQueries({ 
+        predicate: (query) => 
+          typeof query.queryKey[0] === 'string' && 
+          query.queryKey[0].startsWith('/api/employees') 
+      });
+      queryClient.invalidateQueries({ 
+        predicate: (query) => 
+          typeof query.queryKey[0] === 'string' && 
+          query.queryKey[0].startsWith('/api/statistics') 
+      });
       // --- FINE MODIFICA ---
       toast({
         title: "Successo",
@@ -101,13 +135,32 @@ export default function CalendarDay() {
   const deleteApartmentMutation = useMutation({
     mutationFn: (id: number) => 
       apiRequest('DELETE', `/api/apartments/${id}`),
+    
+    // === INIZIO CORREZIONE PER DELETE ===
     onSuccess: () => {
-      // --- INIZIO MODIFICA ---
-      queryClient.invalidateQueries({ queryKey: ['/api/apartments'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/calendar'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/employees'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/statistics'] });
-      // --- FINE MODIFICA ---
+      // Invalida usando predicate per includere query dinamiche
+      queryClient.invalidateQueries({ 
+        predicate: (query) => 
+          typeof query.queryKey[0] === 'string' && 
+          query.queryKey[0].startsWith('/api/apartments') 
+      });
+      queryClient.invalidateQueries({ 
+        predicate: (query) => 
+          typeof query.queryKey[0] === 'string' && 
+          query.queryKey[0].startsWith('/api/calendar') 
+      });
+      queryClient.invalidateQueries({ 
+        predicate: (query) => 
+          typeof query.queryKey[0] === 'string' && 
+          query.queryKey[0].startsWith('/api/employees') 
+      });
+      queryClient.invalidateQueries({ 
+        predicate: (query) => 
+          typeof query.queryKey[0] === 'string' && 
+          query.queryKey[0].startsWith('/api/statistics') 
+      });
+      // === FINE CORREZIONE PER DELETE ===
+
       toast({
         title: "Successo",
         description: "Ordine eliminato con successo",

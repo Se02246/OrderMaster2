@@ -32,7 +32,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         // 1. Applica il colore dal database
         document.documentElement.style.setProperty(
           "--primary",
-          user.theme_color
+          user.theme_color,
         );
         // 2. Salvalo nel localStorage per ricaricamenti futuri (evita flash di colore)
         localStorage.setItem("themeColor", user.theme_color);
@@ -52,10 +52,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   const logout = async () => {
     try {
       await apiRequest("POST", "/api/auth/logout");
-      
+
       // 1. Naviga prima alla pagina di login.
       navigate("/login");
-      
+
       // 2. Pulisci la cache DOPO la navigazione.
       queryClient.clear();
 
@@ -71,15 +71,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 
   const contextValue = useMemo(
     // === INIZIO MODIFICA ===
-    // Corretto l'errore di battitura (rimosso lo spazio)
+    // Assicurati che ci siano le parentesi tonde () attorno
+    // alle parentesi graffe {} per restituire un oggetto.
     () => ({
-    // === FINE MODIFICA ===
+      // === FINE MODIFICA ===
       user,
       isLoading,
       error,
       logout,
     }),
-    [user, isLoading, error]
+    [user, isLoading, error],
   );
 
   // Blocco 'if (isLoading ...)' rimosso correttamente per

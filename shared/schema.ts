@@ -82,20 +82,39 @@ export type InsertEmployee = z.infer<typeof insertEmployeeSchema>;
 export type Assignment = typeof assignments.$inferSelect;
 export type InsertAssignment = z.infer<typeof insertAssignmentSchema>;
 
-// --- Schemi Estesi (QUI C'È LA MODIFICA) ---
+// --- Schemi Estesi (MODIFICATO) ---
 export const apartmentWithEmployeesSchema = z.object({
-  ...insertApartmentSchema.shape,
-  price: z.union([z.string(), z.number()]).optional().nullable(),
+  ...insertApartmentSchema.shape, // price qui è z.string().optional().nullable()
   
   // === INIZIO MODIFICA ===
-  // Torniamo a uno schema semplice e pulito. 
-  // Ci aspettiamo un array di numeri. Punto.
-  // Il lavoro di conversione sarà fatto al 100% nel componente del form.
+  // Sovrascriviamo 'price' per gestire correttamente la trasformazione
+  price: z.preprocess(
+    (val) => {
+      // Se è una stringa vuota, null o undefined, trasformalo in 'null'
+      if (val === "" || val === null || val === undefined) {
+        return null;
+      }
+      // Altrimenti, prova a convertirlo in numero
+      const num = Number(val);
+      // Se non è un numero (es. "abc"), restituisce il valore originale
+      // così la validazione di z.number() fallirà come previsto.
+      // Se è un numero, restituisci il numero.
+      return isNaN(num) ? val : num;
+    },
+    // Ora valida che sia un numero, o nullo.
+    z.number({
+      invalid_type_error: "Il prezzo deve essere un numero valido.",
+    })
+    .min(0, { message: "Il prezzo non può essere negativo." })
+    .nullable() // Permetti 'null'
+    .optional() // Permetti 'undefined'
+  ),
+  // === FINE MODIFICA ===
+  
   employee_ids: z.array(
     z.number({ invalid_type_error: "ID cliente deve essere un numero." })
      .min(1, "ID cliente non valido.")
   ).optional(),
-  // === FINE MODIFICA ===
 });
 
 export type ApartmentWithEmployees = z.infer<typeof apartmentWithEmployeesSchema>;

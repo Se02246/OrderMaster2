@@ -77,10 +77,14 @@ export const assignmentsRelations = relations(assignments, ({ one }) => ({
 }));
 
 // Insert schemas
+// === INIZIO MODIFICA ===
+// Diciamo a Zod di ignorare 'user_id' durante la validazione dell'input,
+// perché verrà aggiunto dal server.
 export const insertUserSchema = createInsertSchema(users).omit({ id: true });
-export const insertApartmentSchema = createInsertSchema(apartments).omit({ id: true });
-export const insertEmployeeSchema = createInsertSchema(employees).omit({ id: true });
+export const insertApartmentSchema = createInsertSchema(apartments).omit({ id: true, user_id: true });
+export const insertEmployeeSchema = createInsertSchema(employees).omit({ id: true, user_id: true });
 export const insertAssignmentSchema = createInsertSchema(assignments).omit({ id: true });
+// === FINE MODIFICA ===
 
 // Types
 export type User = typeof users.$inferSelect;
@@ -94,7 +98,7 @@ export type InsertAssignment = z.infer<typeof insertAssignmentSchema>;
 
 // Extended schemas for API operations
 export const apartmentWithEmployeesSchema = z.object({
-  ...insertApartmentSchema.shape,
+  ...insertApartmentSchema.shape, // Ora questo schema non richiede più user_id
   price: z.union([z.string(), z.number()]).optional().nullable(),
   employee_ids: z.array(z.number()).optional(),
 });

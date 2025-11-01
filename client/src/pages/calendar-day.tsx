@@ -1,19 +1,20 @@
 import { useState } from "react";
 import { useParams, Link } from "wouter";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"; // Modificato
 import { format } from "date-fns";
 import { it } from "date-fns/locale";
 import ApartmentCard from "@/components/ui/data-display/ApartmentCard";
 import { ApartmentModal } from "@/components/ui/modals/ApartmentModal";
 import ConfirmDeleteModal from "@/components/ui/modals/ConfirmDeleteModal";
 import { Button } from "@/components/ui/button";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { apiRequest } from "@/lib/queryClient"; // Modificato
 import { useToast } from "@/hooks/use-toast";
 import { ApartmentWithAssignedEmployees, Employee } from "@shared/schema";
 import { ApartmentFormData } from "@/components/ui/modals/types";
 
 export default function CalendarDay() {
   const { toast } = useToast();
+  const queryClient = useQueryClient(); // Aggiunto
   const params = useParams<{ year: string; month: string; day: string }>();
   
   // Convert params to numbers
@@ -49,7 +50,12 @@ export default function CalendarDay() {
     mutationFn: (data: ApartmentFormData) => 
       apiRequest('POST', '/api/apartments', data),
     onSuccess: () => {
-      queryClient.invalidateQueries();
+      // --- INIZIO MODIFICA ---
+      queryClient.invalidateQueries({ queryKey: ['/api/apartments'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/calendar'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/employees'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/statistics'] });
+      // --- FINE MODIFICA ---
       toast({
         title: "Successo",
         description: "Ordine creato con successo",
@@ -70,7 +76,12 @@ export default function CalendarDay() {
     mutationFn: ({ id, data }: { id: number, data: ApartmentFormData }) => 
       apiRequest('PUT', `/api/apartments/${id}`, data),
     onSuccess: () => {
-      queryClient.invalidateQueries();
+      // --- INIZIO MODIFICA ---
+      queryClient.invalidateQueries({ queryKey: ['/api/apartments'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/calendar'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/employees'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/statistics'] });
+      // --- FINE MODIFICA ---
       toast({
         title: "Successo",
         description: "Ordine aggiornato con successo",
@@ -91,7 +102,12 @@ export default function CalendarDay() {
     mutationFn: (id: number) => 
       apiRequest('DELETE', `/api/apartments/${id}`),
     onSuccess: () => {
-      queryClient.invalidateQueries();
+      // --- INIZIO MODIFICA ---
+      queryClient.invalidateQueries({ queryKey: ['/api/apartments'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/calendar'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/employees'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/statistics'] });
+      // --- FINE MODIFICA ---
       toast({
         title: "Successo",
         description: "Ordine eliminato con successo",

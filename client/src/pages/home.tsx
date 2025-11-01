@@ -1,12 +1,10 @@
 import { useState, useRef } from "react";
-// --- 1. MODIFICA: Importa useQueryClient ---
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import ApartmentCard from "@/components/ui/data-display/ApartmentCard";
 import { ApartmentModal } from "@/components/ui/modals/ApartmentModal";
 import ConfirmDeleteModal from "@/components/ui/modals/ConfirmDeleteModal";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-// --- 2. MODIFICA: Rimuovi l'importazione di queryClient ---
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { ApartmentWithAssignedEmployees, Employee } from "@shared/schema";
@@ -15,7 +13,6 @@ import { Palette } from "lucide-react";
 
 export default function Home() {
   const { toast } = useToast();
-  // --- 3. MODIFICA: Ottieni il client tramite il hook ---
   const queryClient = useQueryClient();
   const [searchQuery, setSearchQuery] = useState("");
   const [sortBy, setSortBy] = useState<"date" | "name">("date");
@@ -25,9 +22,28 @@ export default function Home() {
   const [apartmentToDelete, setApartmentToDelete] = useState<{ id: number, name: string } | null>(null);
   const colorInputRef = useRef<HTMLInputElement>(null);
 
+  // === INIZIO MODIFICA: Mutazione per salvare il tema ===
+  const updateThemeMutation = useMutation({
+    mutationFn: (newColor: string) => 
+      apiRequest('PUT', '/api/users/theme', { color: newColor }),
+    onSuccess: (data) => {
+      // Aggiorna i dati dell'utente in cache con la risposta del server
+      queryClient.setQueryData(['/api/auth/me'], data);
+    },
+    onError: (error) => {
+      toast({
+        title: "Errore Tema",
+        description: `Impossibile salvare il colore: ${error.message}`,
+        variant: "destructive",
+      });
+      // (Opzionale: ricaricare il vecchio colore da localStorage/cache)
+    }
+  });
+  // === FINE MODIFICA ===
+
   const handleColorChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newColor = e.target.value;
-    // Convert hex to HSL and set CSS variable
+    // ... (tutta la logica di conversione hex -> hsl rimane invariata) ...
     let r = 0, g = 0, b = 0;
     if (newColor.length == 4) {
       r = parseInt(newColor[1] + newColor[1], 16);
@@ -57,15 +73,22 @@ export default function Home() {
     l = +(l * 100).toFixed(1);
 
     const primaryHsl = `${h} ${s}% ${l}%`;
+    
+    // Aggiornamento ottimistico (immediato)
     document.documentElement.style.setProperty('--primary', primaryHsl);
     localStorage.setItem("themeColor", primaryHsl);
+
+    // === INIZIO MODIFICA: Salva nel database ===
+    updateThemeMutation.mutate(primaryHsl);
+    // === FINE MODIFICA ===
   };
 
   const openColorPicker = () => {
     colorInputRef.current?.click();
   };
 
-
+  // ... (tutto il resto del file: fetch appartamenti, mutazioni ordini, etc. rimane invariato) ...
+  
   // Fetch apartments
   const { data: apartments, isLoading: isLoadingApartments } = useQuery<ApartmentWithAssignedEmployees[]>({
     queryKey: [`/api/apartments?sortBy=${sortBy}${searchQuery ? `&search=${searchQuery}` : ''}`],
@@ -81,8 +104,6 @@ export default function Home() {
     mutationFn: (data: ApartmentFormData) => 
       apiRequest('POST', '/api/apartments', data),
     onSuccess: () => {
-      // --- 4. MODIFICA: Specifica quali query invalidare ---
-      // === Correzione: usiamo predicate per createApartmentMutation ===
       queryClient.invalidateQueries({ 
         predicate: (query) => 
           typeof query.queryKey[0] === 'string' && 
@@ -103,7 +124,6 @@ export default function Home() {
           typeof query.queryKey[0] === 'string' && 
           query.queryKey[0].startsWith('/api/statistics') 
       });
-      // --- FINE MODIFICA ---
       toast({
         title: "Successo",
         description: "Ordine creato con successo",
@@ -124,8 +144,6 @@ export default function Home() {
     mutationFn: ({ id, data }: { id: number, data: ApartmentFormData }) => 
       apiRequest('PUT', `/api/apartments/${id}`, data),
     onSuccess: () => {
-      // --- 4. MODIFICA: Specifica quali query invalidare ---
-      // === Correzione: usiamo predicate per updateApartmentMutation ===
       queryClient.invalidateQueries({ 
         predicate: (query) => 
           typeof query.queryKey[0] === 'string' && 
@@ -146,7 +164,6 @@ export default function Home() {
           typeof query.queryKey[0] === 'string' && 
           query.queryKey[0].startsWith('/api/statistics') 
       });
-      // --- FINE MODIFICA ---
       toast({
         title: "Successo",
         description: "Ordine aggiornato con successo",
@@ -166,10 +183,7 @@ export default function Home() {
   const deleteApartmentMutation = useMutation({
     mutationFn: (id: number) => 
       apiRequest('DELETE', `/api/apartments/${id}`),
-    
-    // === INIZIO CORREZIONE PER DELETE ===
     onSuccess: () => {
-      // Invalida usando predicate per includere query dinamiche
       queryClient.invalidateQueries({ 
         predicate: (query) => 
           typeof query.queryKey[0] === 'string' && 
@@ -190,8 +204,6 @@ export default function Home() {
           typeof query.queryKey[0] === 'string' && 
           query.queryKey[0].startsWith('/api/statistics') 
       });
-      // === FINE CORREZIONE PER DELETE ===
-
       toast({
         title: "Successo",
         description: "Ordine eliminato con successo",

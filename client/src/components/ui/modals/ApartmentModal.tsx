@@ -4,7 +4,10 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiRequest, getQueryFn } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { Apartment, apartmentSchema, Employee } from "@shared/schema";
+// === INIZIO MODIFICA ===
+// Importiamo 'apartmentWithEmployeesSchema' invece di 'apartmentSchema'
+import { Apartment, Employee, apartmentWithEmployeesSchema } from "@shared/schema";
+// === FINE MODIFICA ===
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
@@ -22,10 +25,10 @@ import { it } from "date-fns/locale";
 
 type ApartmentModalProps = ModalProps<Apartment>;
 
-// Zod schema per il form, che include un array di ID per le checkbox
-const formSchema = apartmentSchema.omit({ id: true, user_id: true }).extend({
-  employee_ids: z.array(z.number()).default([]),
-});
+// === INIZIO MODIFICA ===
+// Usiamo direttamente lo schema importato
+const formSchema = apartmentWithEmployeesSchema;
+// === FINE MODIFICA ===
 type ApartmentFormValues = z.infer<typeof formSchema>;
 
 export function ApartmentModal({ isOpen, onClose, data }: ApartmentModalProps) {
@@ -80,11 +83,8 @@ export function ApartmentModal({ isOpen, onClose, data }: ApartmentModalProps) {
       return apiRequest(method, url, apartmentData);
     },
     onSuccess: (res) => {
-      // === INIZIO MODIFICA ===
-      // 'res' è GIA' l'oggetto JSON, non la risposta fetch.
-      // Rimuoviamo (await res.json())
+      // 'res' è GIA' l'oggetto JSON (correzione precedente)
       const newApartment = res as Apartment;
-      // === FINE MODIFICA ===
 
       toast({
         title: isEditMode ? "Ordine aggiornato" : "Ordine creato",
@@ -106,7 +106,7 @@ export function ApartmentModal({ isOpen, onClose, data }: ApartmentModalProps) {
   });
 
   const onSubmit = (formData: ApartmentFormValues) => {
-    // Trasforma la data se necessario (anche se il component Calendar usa già Date)
+    // Trasforma la data in stringa YYYY-MM-DD
     const processedData = {
       ...formData,
       cleaning_date: format(new Date(formData.cleaning_date), "yyyy-MM-dd"),
@@ -135,6 +135,7 @@ export function ApartmentModal({ isOpen, onClose, data }: ApartmentModalProps) {
                 </FormItem>
               )}
             />
+            {/* ...tutti gli altri FormField rimangono invariati... */}
             <FormField
               control={form.control}
               name="address"

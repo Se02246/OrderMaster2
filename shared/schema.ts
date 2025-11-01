@@ -98,10 +98,16 @@ export const apartmentWithEmployeesSchema = z.object({
   price: z.union([z.string(), z.number()]).optional().nullable(),
   
   // === INIZIO MODIFICA ===
-  // Modifichiamo 'z.number()' in 'z.coerce.number()'.
-  // Questo forzerà Zod a convertire le stringhe (es. "7") in numeri (es. 7)
-  // prima di validare, risolvendo il conflitto string/number.
-  employee_ids: z.array(z.coerce.number()).optional(),
+  // Creiamo una "pipe" di validazione robusta per gli ID dei dipendenti
+  employee_ids: z.array(
+    // 1. Diciamo che l'input può essere stringa o numero
+    z.union([z.string(), z.number()])
+    // 2. Usiamo .transform() per convertire tutto in numero
+    .transform((val) => parseInt(String(val), 10))
+    // 3. Ci assicuriamo che il risultato sia un numero valido (non NaN)
+    //    e impostiamo un messaggio di errore chiaro.
+    .pipe(z.number({ invalid_type_error: "ID cliente non valido" }).min(1, "ID cliente non valido"))
+  ).optional()
   // === FINE MODIFICA ===
 });
 

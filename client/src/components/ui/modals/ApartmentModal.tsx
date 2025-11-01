@@ -1,358 +1,400 @@
-import { useEffect, useState } from "react";
+import React, { useState } from "react"; // Assicurati che React sia importato
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { format } from "date-fns";
+import { it } from "date-fns/locale";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+
+import { apiRequest, getQueryFn } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
+import {
+  type ApartmentWithAssignedEmployees,
+  type Employee,
+  apartmentWithEmployeesSchema,
+} from "@shared/schema";
+
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { X, UserPlus, Search } from "lucide-react";
-import { ApartmentModalProps, ApartmentFormData, EmployeeFormData } from "./types";
-import EmployeeModal from "./EmployeeModal";
-import { useMutation } from "@tanstack/react-query";
-import { apiRequest, queryClient } from "@/lib/queryClient";
-import { useToast } from "@/hooks/use-toast";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
+import { CalendarIcon, PlusCircle, User } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Separator } from "@/components/ui/separator";
 
-// Form schema
-const formSchema = z.object({
-  name: z.string().min(1, "Il nome è obbligatorio"),
-  cleaning_date: z.string().min(1, "La data è obbligatoria"),
-  start_time: z.string().optional(),
-  status: z.enum(["Da Fare", "In Corso", "Fatto"]),
-  payment_status: z.enum(["Da Pagare", "Pagato"]),
-  notes: z.string().optional(),
-  employee_ids: z.array(z.number()),
-  price: z.coerce.number().min(0, "Il prezzo non può essere negativo").optional(),
-});
+import { type ModalProps } from "./types";
+import { EmployeeModal } from "./EmployeeModal";
 
-export default function ApartmentModal({ isOpen, onClose, onSubmit, apartment, employees }: ApartmentModalProps) {
-  const isEditing = !!apartment;
+type FormValues = z.infer<typeof apartmentWithEmployeesSchema>;
+
+type ApartmentModalProps = ModalProps<ApartmentWithAssignedEmployees>;
+
+export function ApartmentModal({
+  mode,
+  data: apartment,
+  isOpen,
+  onClose,
+}: ApartmentModalProps) {
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   const [isEmployeeModalOpen, setIsEmployeeModalOpen] = useState(false);
-  const [searchQuery, setSearchQuery] = useState("");
 
-  const filteredEmployees = employees.filter(employee =>
-    `${employee.first_name} ${employee.last_name}`.toLowerCase().includes(searchQuery.toLowerCase())
-  );
-
-  const createEmployeeMutation = useMutation({
-    mutationFn: (data: EmployeeFormData) =>
-      apiRequest('POST', '/api/employees', data),
-    onSuccess: (newEmployee) => {
-      queryClient.invalidateQueries();
-      toast({
-        title: "Successo",
-        description: "Cliente creato con successo",
-      });
-      setIsEmployeeModalOpen(false);
-      // Add the new employee to the selection
-      const currentEmployeeIds = form.getValues("employee_ids");
-      form.setValue("employee_ids", [...currentEmployeeIds, newEmployee.id]);
-    },
-    onError: (error) => {
-      toast({
-        title: "Errore",
-        description: `Errore durante la creazione: ${error.message}`,
-        variant: "destructive",
-      });
-    }
+  // Carica i dipendenti per la selezione
+  const { data: employees } = useQuery<Employee[]>({
+    queryKey: ["/api/employees"],
   });
 
-  // Initialize form
-  const form = useForm<ApartmentFormData>({
-    resolver: zodResolver(formSchema),
+  // Setup del form
+  const form = useForm<FormValues>({
+    resolver: zodResolver(apartmentWithEmployeesSchema),
     defaultValues: {
-      name: apartment?.name || "",
-      cleaning_date: apartment?.cleaning_date || "",
-      start_time: apartment?.start_time || "",
-      status: apartment?.status || "Da Fare",
-      payment_status: apartment?.payment_status || "Da Pagare",
-      notes: apartment?.notes || "",
-      employee_ids: apartment?.employees.map(e => e.id) || [],
-      price: apartment?.price ? Number(apartment.price) : 0,
-    }
+      name: apartment?.name ?? "",
+      cleaning_date: apartment?.cleaning_date ?? format(new Date(), "yyyy-MM-dd"),
+      start_time: apartment?.start_time ?? "",
+      status: apartment?.status ?? "Da Fare",
+      payment_status: apartment?.payment_status ?? "Da Pagare",
+      price: apartment?.price ?? "",
+      notes: apartment?.notes ?? "",
+      employee_ids: apartment?.employees.map((e) => e.id) ?? [],
+    },
   });
 
-  // Reset form when apartment changes
-  useEffect(() => {
+  // Resetta il form quando i dati o la modalità cambiano
+  React.useEffect(() => {
     if (isOpen) {
       form.reset({
-        name: apartment?.name || "",
-        cleaning_date: apartment?.cleaning_date || "",
-        start_time: apartment?.start_time || "",
-        status: apartment?.status || "Da Fare",
-        payment_status: apartment?.payment_status || "Da Pagare",
-        notes: apartment?.notes || "",
-        employee_ids: apartment?.employees.map(e => e.id) || [],
-        price: apartment?.price ? Number(apartment.price) : 0,
+        name: apartment?.name ?? "",
+        cleaning_date: apartment?.cleaning_date ?? format(new Date(), "yyyy-MM-dd"),
+        start_time: apartment?.start_time ?? "",
+        status: apartment?.status ?? "Da Fare",
+        payment_status: apartment?.payment_status ?? "Da Pagare",
+        price: apartment?.price ?? "",
+        notes: apartment?.notes ?? "",
+        employee_ids: apartment?.employees.map((e) => e.id) ?? [],
       });
     }
-  }, [isOpen, apartment, form.reset]);
+  }, [isOpen, apartment, form]);
+  
+  // Mutazione per creare/aggiornare l'appartamento
+  const mutation = useMutation({
+    mutationFn: (values: FormValues) => {
+      const url =
+        mode === "edit" ? `/api/apartments/${apartment!.id}` : "/api/apartments";
+      const method = mode === "edit" ? "PUT" : "POST";
+      return apiRequest(method, url, values);
+    },
+    onSuccess: () => {
+      toast({
+        title: `Ordine ${mode === "edit" ? "aggiornato" : "creato"}`,
+        description: `L'ordine è stato ${
+          mode === "edit" ? "aggiornato" : "creato"
+        } con successo.`,
+      });
+      // Invalida tutte le query relative per aggiornare l'interfaccia
+      queryClient.invalidateQueries({ queryKey: ["/api/apartments"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/calendar"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/statistics"] });
+      onClose();
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Errore",
+        description: error.message || "Si è verificato un errore.",
+        variant: "destructive",
+      });
+    },
+  });
 
-  const handleEmployeeSubmit = (data: EmployeeFormData) => {
-    createEmployeeMutation.mutate(data);
+  const onSubmit = (values: FormValues) => {
+    mutation.mutate(values);
   };
 
-  if (!isOpen) return null;
+  const onEmployeeCreated = () => {
+    // Aggiorna l'elenco dei dipendenti
+    queryClient.invalidateQueries({ queryKey: ["/api/employees"] });
+    setIsEmployeeModalOpen(false);
+  };
 
   return (
     <>
-      <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
-        <div className="bg-white rounded-lg shadow-lg w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto">
-          <div className="p-6">
-            <div className="flex justify-between items-center mb-6">
-              <h3 className="text-xl font-semibold text-dark">
-                {isEditing ? "Modifica Ordine" : "Aggiungi Ordine"}
-              </h3>
-              <button
-                onClick={onClose}
-                className="text-gray-400 hover:text-gray-600 p-1 rounded-full hover:bg-gray-100"
-              >
-                <X size={20} />
-              </button>
-            </div>
-
-            <Form {...form}>
-              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5">
+      <Dialog open={isOpen} onOpenChange={onClose}>
+        <DialogContent className="max-w-md sm:max-w-2xl max-h-[90vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle>
+              {mode === "edit" ? "Modifica Ordine" : "Nuovo Ordine"}
+            </DialogTitle>
+          </DialogHeader>
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 overflow-y-auto px-1">
+              {/* Sezione Dati Principali */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <FormField
                   control={form.control}
                   name="name"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel className="text-sm font-medium text-gray-700">Nome Ordine</FormLabel>
+                      <FormLabel>Nome Ordine</FormLabel>
                       <FormControl>
-                        <Input
-                          {...field}
-                          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary"
-                        />
+                        <Input placeholder="Es. Appartamento 101" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <FormField
-                    control={form.control}
-                    name="cleaning_date"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel className="text-sm font-medium text-gray-700">Data</FormLabel>
-                        <FormControl>
-                          <Input
-                            {...field}
-                            type="date"
-                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary"
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={form.control}
-                    name="start_time"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel className="text-sm font-medium text-gray-700">Ora</FormLabel>
-                        <FormControl>
-                          <Input
-                            {...field}
-                            type="time"
-                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary"
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="price"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel className="text-sm font-medium text-gray-700">Prezzo (€)</FormLabel>
-                        <FormControl>
-                          <Input
-                            {...field}
-                            type="number"
-                            step="0.01"
-                            placeholder="Es. 50.00"
-                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary"
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <FormField
-                    control={form.control}
-                    name="status"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel className="text-sm font-medium text-gray-700">Stato</FormLabel>
-                        <Select
-                          onValueChange={field.onChange}
-                          value={field.value}
-                        >
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Seleziona uno stato" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            <SelectItem value="Da Fare">Da Fare</SelectItem>
-                            <SelectItem value="In Corso">In Corso</SelectItem>
-                            <SelectItem value="Fatto">Fatto</SelectItem>
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={form.control}
-                    name="payment_status"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel className="text-sm font-medium text-gray-700">Pagamento</FormLabel>
-                        <Select
-                          onValueChange={field.onChange}
-                          value={field.value}
-                        >
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Seleziona stato pagamento" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            <SelectItem value="Da Pagare">Da Pagare</SelectItem>
-                            <SelectItem value="Pagato">Pagato</SelectItem>
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
-
                 <FormField
                   control={form.control}
-                  name="employee_ids"
-                  render={() => (
-                    <FormItem>
-                      <div className="flex justify-between items-center mb-2">
-                        <FormLabel className="text-sm font-medium text-gray-700">Clienti</FormLabel>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setIsEmployeeModalOpen(true)}
-                        >
-                          <UserPlus className="mr-2 h-4 w-4" />
-                          Nuovo Cliente
-                        </Button>
-                      </div>
-                      <div className="relative">
-                        <Input
-                          type="search"
-                          placeholder="Cerca cliente..."
-                          value={searchQuery}
-                          onChange={(e) => setSearchQuery(e.target.value)}
-                          className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary"
-                        />
-                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-                      </div>
-                      <div className="border border-gray-300 rounded-lg p-3 mt-2 max-h-36 overflow-y-auto">
-                        {filteredEmployees.map((employee) => (
-                          <FormField
-                            key={employee.id}
-                            control={form.control}
-                            name="employee_ids"
-                            render={({ field }) => {
-                              return (
-                                <FormItem
-                                  key={employee.id}
-                                  className="flex items-center mb-2 last:mb-0"
-                                >
-                                  <FormControl>
-                                    <Checkbox
-                                      checked={field.value?.includes(employee.id)}
-                                      onCheckedChange={(checked) => {
-                                        return checked
-                                          ? field.onChange([...field.value, employee.id])
-                                          : field.onChange(
-                                            field.value?.filter(
-                                              (value) => value !== employee.id
-                                            )
-                                          )
-                                      }}
-                                    />
-                                  </FormControl>
-                                  <FormLabel className="ml-2 text-sm text-gray-700">
-                                    {employee.first_name} {employee.last_name}
-                                  </FormLabel>
-                                </FormItem>
-                              )
-                            }}
-                          />
-                        ))}
-                      </div>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="notes"
+                  name="price"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel className="text-sm font-medium text-gray-700">Note</FormLabel>
+                      <FormLabel>Prezzo</FormLabel>
                       <FormControl>
-                        <Textarea
-                          {...field}
-                          rows={3}
-                          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary"
-                        />
+                        <Input type="number" placeholder="Es. 50.00" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
+              </div>
 
-                <div className="mt-8 flex justify-end space-x-3">
-                  <Button
-                    type="button"
-                    onClick={onClose}
-                    variant="outline"
-                    className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 font-medium hover:bg-gray-50"
-                  >
-                    ANNULLA
-                  </Button>
-                  <Button
-                    type="submit"
-                    className="px-4 py-2 bg-primary hover:bg-primary/90 rounded-lg text-primary-foreground font-medium"
-                  >
-                    {isEditing ? "SALVA" : "CREA"}
-                  </Button>
-                </div>
-              </form>
-            </Form>
-          </div>
-        </div>
-      </div>
+              {/* Sezione Data e Ora */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="cleaning_date"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-col pt-2">
+                      <FormLabel>Data Pulizia</FormLabel>
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <FormControl>
+                            <Button
+                              variant={"outline"}
+                              className={cn(
+                                "pl-3 text-left font-normal",
+                                !field.value && "text-muted-foreground"
+                              )}
+                            >
+                              {field.value ? (
+                                format(new Date(field.value + "T00:00:00"), "PPP", { locale: it })
+                              ) : (
+                                <span>Scegli una data</span>
+                              )}
+                              <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                            </Button>
+                          </FormControl>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="start">
+                          <Calendar
+                            mode="single"
+                            selected={field.value ? new Date(field.value + "T00:00:00") : undefined}
+                            onSelect={(date) =>
+                              field.onChange(date ? format(date, "yyyy-MM-dd") : "")
+                            }
+                            initialFocus
+                          />
+                        </PopoverContent>
+                      </Popover>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="start_time"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Ora Inizio</FormLabel>
+                      <FormControl>
+                        <Input type="time" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              {/* Sezione Stato */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="status"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Stato Ordine</FormLabel>
+                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Seleziona stato..." />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="Da Fare">Da Fare</SelectItem>
+                          <SelectItem value="In Corso">In Corso</SelectItem>
+                          <SelectItem value="Fatto">Fatto</S-
+lectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                
+                <FormField
+                  control={form.control}
+                  name="payment_status"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Stato Pagamento</FormLabel>
+                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Seleziona stato..." />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="Da Pagare">Da Pagare</SelectItem>
+                          <SelectItem value="Pagato">Pagato</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              <Separator />
+
+              {/* Sezione Clienti (Dipendenti) */}
+              <FormField
+                control={form.control}
+                name="employee_ids"
+                render={({ field }) => (
+                  <FormItem>
+                    <div className="flex justify-between items-center mb-2">
+                      <FormLabel className="text-lg">Clienti Assegnati</FormLabel>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setIsEmployeeModalOpen(true)}
+                      >
+                        <PlusCircle className="mr-2 h-4 w-4" />
+                        Nuovo Cliente
+                      </Button>
+                    </div>
+                    <ScrollArea className="h-40 w-full rounded-md border">
+                      <FormControl>
+                        <ToggleGroup
+                          type="multiple"
+                          variant="outline"
+                          className="flex-wrap justify-start p-4"
+                          
+                          // === INIZIO MODIFICA ===
+                          // Leggiamo il valore. Ci assicuriamo che sia un array e lo
+                          // convertiamo in stringhe per il ToggleGroup.
+                          // Questo gestisce anche i casi null/undefined.
+                          value={Array.isArray(field.value) ? field.value.map(String) : []}
+                          
+                          onValueChange={(value: string[]) => {
+                            // 'value' è SEMPRE un array di stringhe (es. ["1", "5"])
+                            // Trasformiamolo in un array di numeri.
+                            const numericValue = value
+                              .map(id => parseInt(id, 10)) // Converte ["1", "5"] in [1, 5]
+                              .filter(id => !isNaN(id) && id > 0); // Rimuove eventuali NaN o 0
+                            
+                            // Passiamo l'array di numeri pulito a react-hook-form
+                            field.onChange(numericValue);
+                          }}
+                          // === FINE MODIFICA ===
+                        >
+                          {employees?.map((employee) => (
+                            <ToggleGroupItem
+                              key={employee.id}
+                              value={String(employee.id)} // Il valore deve essere una stringa
+                              className="flex gap-2"
+                              aria-label={`Toggle ${employee.first_name}`}
+                            >
+                              <User className="h-4 w-4" />
+                              {employee.first_name} {employee.last_name}
+                            </ToggleGroupItem>
+                          ))}
+                        </ToggleGroup>
+                      </FormControl>
+                    </ScrollArea>
+                    <FormMessage /> {/* Qui non apparirà più "undefined" */}
+                  </FormItem>
+                )}
+              />
+
+              {/* Sezione Note */}
+              <FormField
+                control={form.control}
+                name="notes"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Note</FormLabel>
+                    <FormControl>
+                      <Textarea placeholder="Note sull'ordine..." {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <DialogFooter className="pt-4">
+                <Button variant="ghost" type="button" onClick={onClose}>
+                  Annulla
+                </Button>
+                <Button type="submit" disabled={mutation.isPending}>
+                  {mutation.isPending
+                    ? "Salvataggio..."
+                    : mode === "edit"
+                    ? "Salva Modifiche"
+                    : "Crea Ordine"}
+                </Button>
+              </DialogFooter>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal per creare un nuovo dipendente/cliente */}
       <EmployeeModal
+        mode="create"
         isOpen={isEmployeeModalOpen}
         onClose={() => setIsEmployeeModalOpen(false)}
-        onSubmit={handleEmployeeSubmit}
+        onSuccess={onEmployeeCreated}
       />
     </>
   );

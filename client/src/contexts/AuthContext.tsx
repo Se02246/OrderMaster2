@@ -24,10 +24,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     
     // === INIZIO MODIFICA ===
     onSuccess: (user) => {
+      // Quando i dati dell'utente vengono caricati con successo
       if (user && user.theme_color) {
-        // Applica il colore dal database
+        // 1. Applica il colore dal database
         document.documentElement.style.setProperty('--primary', user.theme_color);
-        // Salva nel localStorage per il prossimo caricamento (più veloce)
+        // 2. Salvalo nel localStorage per ricaricamenti futuri (evita flash di colore)
         localStorage.setItem("themeColor", user.theme_color);
       }
     },

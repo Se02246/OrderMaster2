@@ -154,6 +154,7 @@ export function ApartmentModal({
             </DialogTitle>
           </DialogHeader>
           <Form {...form}>
+            {/* Il form inizia qui */}
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 overflow-y-auto px-1">
               {/* Sezione Dati Principali */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -202,46 +203,3 @@ export function ApartmentModal({
                               className={cn(
                                 "pl-3 text-left font-normal",
                                 !field.value && "text-muted-foreground"
-                              )}
-                            >
-                              {field.value ? (
-                                format(new Date(field.value + "T00:00:00"), "PPP", { locale: it })
-                              ) : (
-                                <span>Scegli una data</span>
-                              )}
-                              <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                            </Button>
-                          </FormControl>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0" align="start">
-                          <Calendar
-                            mode="single"
-                            selected={field.value ? new Date(field.value + "T00:00:00") : undefined}
-                            onSelect={(date) =>
-                              field.onChange(date ? format(date, "yyyy-MM-dd") : "")
-                            }
-                            initialFocus
-                          />
-                        </PopoverContent>
-                      </Popover>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="start_time"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Ora Inizio</FormLabel>
-                      <FormControl>
-                        <Input type="time" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-
-              {/* Sezione Stato */}

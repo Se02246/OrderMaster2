@@ -1,143 +1,137 @@
-import React from "react";
+import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import {
-  type Employee,
-  insertEmployeeSchema,
-} from "@shared/schema";
-
+import { Employee, insertEmployeeSchema } from "@shared/schema";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from "@/components/ui/dialog";
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@/components/ui/form";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import { ModalProps } from "./types";
 
-import { type ModalProps } from "./types";
+type EmployeeModalProps = ModalProps<Employee>;
 
-type FormValues = z.infer<typeof insertEmployeeSchema>;
+// Usiamo insertEmployeeSchema per validare il form (omettendo id e user_id)
+const formSchema = insertEmployeeSchema.omit({ id: true, user_id: true });
+type EmployeeFormValues = z.infer<typeof formSchema>;
 
-interface EmployeeModalProps extends ModalProps {
-  onSuccess?: (employee: Employee) => void;
-}
-
-export function EmployeeModal({
-  // mode, // Rimuoviamo il commento problematico e il parametro non usato
-  isOpen,
-  onClose,
-  onSuccess,
-}: EmployeeModalProps) {
+export function EmployeeModal({ isOpen, onClose, data }: EmployeeModalProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const isEditMode = !!data; // Al momento la modifica non è implementata, ma la logica è qui
 
-  const form = useForm<FormValues>({
-    resolver: zodResolver(insertEmployeeSchema),
-    defaultValues: {
-      first_name: "",
-      last_name: "",
-    },
+  const form = useForm<EmployeeFormValues>({
+    resolver: zodResolver(formSchema),
+    defaultValues: isEditMode
+      ? data
+      : { first_name: "", last_name: "", phone: "" },
   });
 
+  // Reset del form quando 'data' cambia
   React.useEffect(() => {
     if (isOpen) {
-      form.reset({
-        first_name: "",
-        last_name: "",
-      });
+      form.reset(
+        isEditMode
+          ? data
+          : { first_name: "", last_name: "", phone: "" }
+      );
     }
-  }, [isOpen, form]);
+  }, [isOpen, data, isEditMode, form]);
+
 
   const mutation = useMutation({
-    mutationFn: (values: FormValues) => {
-      return apiRequest("POST", "/api/employees", values);
-    },
-    onSuccess: async (res) => {
-      const newEmployee = await res.json();
-      toast({
-        title: "Cliente creato",
-        description: `${newEmployee.first_name} ${newEmployee.last_name} è stato aggiunto.`,
-      });
-      // Invalida solo la query dei dipendenti
-      queryClient.invalidateQueries({ queryKey: ["/api/employees"] });
-      
-      // Chiama la callback di successo se fornita
-      if (onSuccess) {
-        onSuccess(newEmployee);
+    mutationFn: (employeeData: EmployeeFormValues) => {
+      // NOTA: la logica di modifica (PUT) non è richiesta per ora,
+      // quindi gestiamo solo la creazione (POST)
+      if (isEditMode) {
+        // Logica PUT (non implementata nel backend in questo modal)
+        // return apiRequest("PUT", `/api/employees/${data.id}`, employeeData);
+        throw new Error("La modifica non è ancora supportata da questo modal.");
+      } else {
+        // Logica POST
+        return apiRequest("POST", "/api/employees", employeeData);
       }
-      onClose(); // Chiude il modal
+    },
+    onSuccess: (res) => {
+      // === INIZIO MODIFICA ===
+      // 'res' è GIA' l'oggetto JSON, non la risposta fetch.
+      // Rimuoviamo (await res.json())
+      const newEmployee = res as Employee;
+      // === FINE MODIFICA ===
+
+      toast({
+        title: isEditMode ? "Dipendente aggiornato" : "Dipendente creato",
+        description: `${newEmployee.first_name} ${newEmployee.last_name} è stato salvato.`,
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/employees"] });
+      onClose();
     },
     onError: (error: any) => {
       toast({
         title: "Errore",
-        description: error.message || "Impossibile creare il cliente.",
+        description: error.message || "Impossibile salvare il dipendente.",
         variant: "destructive",
       });
     },
   });
 
-  const onSubmit = (values: FormValues) => {
-    mutation.mutate(values);
+  const onSubmit = (data: EmployeeFormValues) => {
+    mutation.mutate(data);
   };
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
-          <DialogTitle>Nuovo Cliente</DialogTitle>
+          <DialogTitle>{isEditMode ? "Modifica Dipendente" : "Nuovo Dipendente"}</DialogTitle>
         </DialogHeader>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <FormField
-                control={form.control}
-                name="first_name"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Nome</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Mario" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="last_name"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Cognome</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Rossi" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
-
-            <DialogFooter className="pt-4">
-              <Button variant="ghost" type="button" onClick={onClose}>
-                Annulla
-              </Button>
+            <FormField
+              control={form.control}
+              name="first_name"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Nome</FormLabel>
+                  <FormControl>
+                    <Input placeholder="Es. Mario" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="last_name"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Cognome</FormLabel>
+                  <FormControl>
+                    <Input placeholder="Es. Rossi" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="phone"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Telefono (opzionale)</FormLabel>
+                  <FormControl>
+                    <Input placeholder="Es. 333 1234567" {...field} value={field.value || ""} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={onClose}>Annulla</Button>
               <Button type="submit" disabled={mutation.isPending}>
-                {mutation.isPending ? "Creazione..." : "Crea Cliente"}
+                {mutation.isPending ? "Salvataggio..." : "Salva Dipendente"}
               </Button>
             </DialogFooter>
           </form>

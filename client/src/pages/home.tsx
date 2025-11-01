@@ -1,11 +1,13 @@
 import { useState, useRef } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"; // Modificato
+// --- 1. MODIFICA: Importa useQueryClient ---
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import ApartmentCard from "@/components/ui/data-display/ApartmentCard";
 import { ApartmentModal } from "@/components/ui/modals/ApartmentModal";
 import ConfirmDeleteModal from "@/components/ui/modals/ConfirmDeleteModal";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { apiRequest } from "@/lib/queryClient"; // Modificato
+// --- 2. MODIFICA: Rimuovi l'importazione di queryClient ---
+import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { ApartmentWithAssignedEmployees, Employee } from "@shared/schema";
 import { ApartmentFormData } from "@/components/ui/modals/types";
@@ -13,7 +15,8 @@ import { Palette } from "lucide-react";
 
 export default function Home() {
   const { toast } = useToast();
-  const queryClient = useQueryClient(); // Aggiunto
+  // --- 3. MODIFICA: Ottieni il client tramite il hook ---
+  const queryClient = useQueryClient();
   const [searchQuery, setSearchQuery] = useState("");
   const [sortBy, setSortBy] = useState<"date" | "name">("date");
   const [isApartmentModalOpen, setIsApartmentModalOpen] = useState(false);
@@ -78,7 +81,7 @@ export default function Home() {
     mutationFn: (data: ApartmentFormData) => 
       apiRequest('POST', '/api/apartments', data),
     onSuccess: () => {
-      // --- INIZIO MODIFICA ---
+      // --- 4. MODIFICA: Specifica quali query invalidare ---
       queryClient.invalidateQueries({ queryKey: ['/api/apartments'] });
       queryClient.invalidateQueries({ queryKey: ['/api/calendar'] });
       queryClient.invalidateQueries({ queryKey: ['/api/employees'] });
@@ -104,7 +107,7 @@ export default function Home() {
     mutationFn: ({ id, data }: { id: number, data: ApartmentFormData }) => 
       apiRequest('PUT', `/api/apartments/${id}`, data),
     onSuccess: () => {
-      // --- INIZIO MODIFICA ---
+      // --- 4. MODIFICA: Specifica quali query invalidare ---
       queryClient.invalidateQueries({ queryKey: ['/api/apartments'] });
       queryClient.invalidateQueries({ queryKey: ['/api/calendar'] });
       queryClient.invalidateQueries({ queryKey: ['/api/employees'] });
@@ -130,7 +133,7 @@ export default function Home() {
     mutationFn: (id: number) => 
       apiRequest('DELETE', `/api/apartments/${id}`),
     onSuccess: () => {
-      // --- INIZIO MODIFICA ---
+      // --- 4. MODIFICA: Specifica quali query invalidare ---
       queryClient.invalidateQueries({ queryKey: ['/api/apartments'] });
       queryClient.invalidateQueries({ queryKey: ['/api/calendar'] });
       queryClient.invalidateQueries({ queryKey: ['/api/employees'] });

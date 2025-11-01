@@ -9,7 +9,7 @@ type AuthContextType = {
   user: SafeUser | null;
   isLoading: boolean;
   error: Error | null;
-  logout: () => void; // Aggiunto
+  logout: () => void;
 };
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -70,17 +70,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   };
 
   const contextValue = useMemo(
-    () => ({
+    () = > ({
       user,
       isLoading,
       error,
-      logout, // Aggiunto
+      logout,
     }),
-    [user, isLoading, error] // logout rimosso dalle dipendenze, non serve
+    [user, isLoading, error]
   );
 
-  // Non mostrare l'app finché non sappiamo se l'utente è loggato
-  // Tranne per la pagina di login
+  // === INIZIO MODIFICA ===
+  // Rimuoviamo il blocco 'if (isLoading ...)' da qui.
+  // Il provider DEVE sempre essere renderizzato, altrimenti
+  // i componenti figli (come App.tsx) non possono chiamare 'useAuth()'
+  // e otterranno un errore (la pagina bianca).
+  // App.tsx gestisce già il suo spinner di caricamento.
+  /*
   if (isLoading && window.location.pathname !== "/login") {
     return (
       <div className="flex items-center justify-center h-screen">
@@ -88,14 +93,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       </div>
     );
   }
+  */
+  // === FINE MODIFICA ===
 
   return (
     <AuthContext.Provider value={contextValue}>{children}</AuthContext.Provider>
   );
 };
 
-// === INIZIO MODIFICA ===
-// Questa è la parte che mancava nell'aggiornamento precedente
 export const useAuth = () => {
   const context = useContext(AuthContext);
   if (context === undefined) {
@@ -103,4 +108,3 @@ export const useAuth = () => {
   }
   return context;
 };
-// === FINE MODIFICA ===

@@ -85,7 +85,7 @@ export type InsertEmployee = z.infer<typeof insertEmployeeSchema>;
 export type Assignment = typeof assignments.$inferSelect;
 export type InsertAssignment = z.infer<typeof insertAssignmentSchema>;
 
-// --- Schemi Estesi (MODIFICATO) ---
+// --- Schemi Estesi ---
 export const apartmentWithEmployeesSchema = z.object({
   ...insertApartmentSchema.shape,
   price: z.preprocess(

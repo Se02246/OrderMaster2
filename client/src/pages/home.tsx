@@ -1,11 +1,14 @@
 import { useState, useRef } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"; // Già importato
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import ApartmentCard from "@/components/ui/data-display/ApartmentCard";
 import { ApartmentModal } from "@/components/ui/modals/ApartmentModal";
 import ConfirmDeleteModal from "@/components/ui/modals/ConfirmDeleteModal";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { apiRequest } from "@/lib/queryClient"; // Già importato
+// === INIZIO MODIFICA ===
+// Importiamo anche getQueryFn
+import { apiRequest, getQueryFn } from "@/lib/queryClient";
+// === FINE MODIFICA ===
 import { useToast } from "@/hooks/use-toast";
 import { ApartmentWithAssignedEmployees, Employee } from "@shared/schema";
 import { ApartmentFormData } from "@/components/ui/modals/types";
@@ -13,7 +16,7 @@ import { Palette } from "lucide-react";
 
 export default function Home() {
   const { toast } = useToast();
-  const queryClient = useQueryClient(); // Già presente
+  const queryClient = useQueryClient();
   const [searchQuery, setSearchQuery] = useState("");
   const [sortBy, setSortBy] = useState<"date" | "name">("date");
   const [isApartmentModalOpen, setIsApartmentModalOpen] = useState(false);
@@ -22,14 +25,12 @@ export default function Home() {
   const [apartmentToDelete, setApartmentToDelete] = useState<{ id: number, name: string } | null>(null);
   const colorInputRef = useRef<HTMLInputElement>(null);
 
-  // === INIZIO MODIFICA: Mutazione per salvare il tema ===
+  // Mutazione per salvare il tema
   const updateThemeMutation = useMutation({
     mutationFn: (hslColor: string) => 
-      // Usiamo la nuova rotta API
       apiRequest('PUT', '/api/users/theme', { color: hslColor }),
     
     onSuccess: (updatedUser) => {
-      // Aggiorna i dati dell'utente in cache (queryKey /api/auth/me)
       queryClient.setQueryData(['/api/auth/me'], updatedUser);
     },
     onError: (error) => {
@@ -40,11 +41,10 @@ export default function Home() {
       });
     }
   });
-  // === FINE MODIFICA ===
 
   const handleColorChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newColor = e.target.value;
-    // ... (tutta la logica di conversione hex -> hsl rimane invariata) ...
+    // ... (logica di conversione hex -> hsl) ...
     let r = 0, g = 0, b = 0;
     if (newColor.length == 4) {
       r = parseInt(newColor[1] + newColor[1], 16);
@@ -75,13 +75,9 @@ export default function Home() {
 
     const primaryHsl = `${h} ${s}% ${l}%`;
     
-    // Aggiornamento ottimistico (immediato)
     document.documentElement.style.setProperty('--primary', primaryHsl);
     localStorage.setItem("themeColor", primaryHsl);
-
-    // === INIZIO MODIFICA: Salva nel database ===
     updateThemeMutation.mutate(primaryHsl);
-    // === FINE MODIFICA ===
   };
 
   const openColorPicker = () => {
@@ -89,42 +85,33 @@ export default function Home() {
   };
 
 
+  // === INIZIO MODIFICA ===
   // Fetch apartments
   const { data: apartments, isLoading: isLoadingApartments } = useQuery<ApartmentWithAssignedEmployees[]>({
-    queryKey: [`/api/apartments?sortBy=${sortBy}${searchQuery ? `&search=${searchQuery}` : ''}`],
+    // 1. Aggiorniamo la queryKey per usare l'oggetto params
+    queryKey: ['/api/apartments', { sortBy, search: searchQuery }],
+    // 2. Aggiungiamo il queryFn mancante
+    queryFn: getQueryFn,
   });
 
   // Fetch employees for the apartment form
   const { data: employees = [] } = useQuery<Employee[]>({
     queryKey: ['/api/employees'],
+    // 3. Aggiungiamo il queryFn mancante
+    queryFn: getQueryFn,
   });
+  // === FINE MODIFICA ===
 
   // Create apartment mutation
-  // ... (questa mutazione rimane invariata e corretta) ...
   const createApartmentMutation = useMutation({
     mutationFn: (data: ApartmentFormData) => 
       apiRequest('POST', '/api/apartments', data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ 
-        predicate: (query) => 
-          typeof query.queryKey[0] === 'string' && 
-          query.queryKey[0].startsWith('/api/apartments') 
-      });
-      queryClient.invalidateQueries({ 
-        predicate: (query) => 
-          typeof query.queryKey[0] === 'string' && 
-          query.queryKey[0].startsWith('/api/calendar') 
-      });
-      queryClient.invalidateQueries({ 
-        predicate: (query) => 
-          typeof query.queryKey[0] === 'string' && 
-          query.queryKey[0].startsWith('/api/employees') 
-      });
-      queryClient.invalidateQueries({ 
-        predicate: (query) => 
-          typeof query.queryKey[0] === 'string' && 
-          query.queryKey[0].startsWith('/api/statistics') 
-      });
+      // Invalidazione query (questa logica è corretta)
+      queryClient.invalidateQueries({ queryKey: ['/api/apartments'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/calendar'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/employees'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/statistics'] });
       toast({
         title: "Successo",
         description: "Ordine creato con successo",
@@ -141,31 +128,15 @@ export default function Home() {
   });
 
   // Update apartment mutation
-  // ... (questa mutazione rimane invariata e corretta) ...
   const updateApartmentMutation = useMutation({
     mutationFn: ({ id, data }: { id: number, data: ApartmentFormData }) => 
       apiRequest('PUT', `/api/apartments/${id}`, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ 
-        predicate: (query) => 
-          typeof query.queryKey[0] === 'string' && 
-          query.queryKey[0].startsWith('/api/apartments') 
-      });
-      queryClient.invalidateQueries({ 
-        predicate: (query) => 
-          typeof query.queryKey[0] === 'string' && 
-          query.queryKey[0].startsWith('/api/calendar') 
-      });
-      queryClient.invalidateQueries({ 
-        predicate: (query) => 
-          typeof query.queryKey[0] === 'string' && 
-          query.queryKey[0].startsWith('/api/employees') 
-      });
-      queryClient.invalidateQueries({ 
-        predicate: (query) => 
-          typeof query.queryKey[0] === 'string' && 
-          query.queryKey[0].startsWith('/api/statistics') 
-      });
+      // Invalidazione query (questa logica è corretta)
+      queryClient.invalidateQueries({ queryKey: ['/api/apartments'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/calendar'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/employees'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/statistics'] });
       toast({
         title: "Successo",
         description: "Ordine aggiornato con successo",
@@ -182,31 +153,15 @@ export default function Home() {
   });
 
   // Delete apartment mutation
-  // ... (questa mutazione rimane invariata e corretta) ...
   const deleteApartmentMutation = useMutation({
     mutationFn: (id: number) => 
       apiRequest('DELETE', `/api/apartments/${id}`),
     onSuccess: () => {
-      queryClient.invalidateQueries({ 
-        predicate: (query) => 
-          typeof query.queryKey[0] === 'string' && 
-          query.queryKey[0].startsWith('/api/apartments') 
-      });
-      queryClient.invalidateQueries({ 
-        predicate: (query) => 
-          typeof query.queryKey[0] === 'string' && 
-          query.queryKey[0].startsWith('/api/calendar') 
-      });
-      queryClient.invalidateQueries({ 
-        predicate: (query) => 
-          typeof query.queryKey[0] === 'string' && 
-          query.queryKey[0].startsWith('/api/employees') 
-      });
-      queryClient.invalidateQueries({ 
-        predicate: (query) => 
-          typeof query.queryKey[0] === 'string' && 
-          query.queryKey[0].startsWith('/api/statistics') 
-      });
+      // Invalidazione query (questa logica è corretta)
+      queryClient.invalidateQueries({ queryKey: ['/api/apartments'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/calendar'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/employees'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/statistics'] });
       toast({
         title: "Successo",
         description: "Ordine eliminato con successo",
@@ -223,7 +178,6 @@ export default function Home() {
   });
 
   // Event handlers
-  // ... (tutto il resto del file rimane invariato) ...
   const handleOpenAddModal = () => {
     setCurrentApartment(undefined);
     setIsApartmentModalOpen(true);

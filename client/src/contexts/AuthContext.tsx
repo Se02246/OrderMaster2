@@ -70,7 +70,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   };
 
   const contextValue = useMemo(
-    () = > ({
+    // === INIZIO MODIFICA ===
+    // Corretto l'errore di battitura (rimosso lo spazio)
+    () => ({
+    // === FINE MODIFICA ===
       user,
       isLoading,
       error,
@@ -79,22 +82,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     [user, isLoading, error]
   );
 
-  // === INIZIO MODIFICA ===
-  // Rimuoviamo il blocco 'if (isLoading ...)' da qui.
-  // Il provider DEVE sempre essere renderizzato, altrimenti
-  // i componenti figli (come App.tsx) non possono chiamare 'useAuth()'
-  // e otterranno un errore (la pagina bianca).
-  // App.tsx gestisce già il suo spinner di caricamento.
-  /*
-  if (isLoading && window.location.pathname !== "/login") {
-    return (
-      <div className="flex items-center justify-center h-screen">
-        <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
-      </div>
-    );
-  }
-  */
-  // === FINE MODIFICA ===
+  // Blocco 'if (isLoading ...)' rimosso correttamente per
+  // evitare la pagina bianca.
 
   return (
     <AuthContext.Provider value={contextValue}>{children}</AuthContext.Provider>

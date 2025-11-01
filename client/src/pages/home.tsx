@@ -1,11 +1,11 @@
 import { useState, useRef } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"; // Già importato
 import ApartmentCard from "@/components/ui/data-display/ApartmentCard";
 import { ApartmentModal } from "@/components/ui/modals/ApartmentModal";
 import ConfirmDeleteModal from "@/components/ui/modals/ConfirmDeleteModal";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { apiRequest } from "@/lib/queryClient";
+import { apiRequest } from "@/lib/queryClient"; // Già importato
 import { useToast } from "@/hooks/use-toast";
 import { ApartmentWithAssignedEmployees, Employee } from "@shared/schema";
 import { ApartmentFormData } from "@/components/ui/modals/types";
@@ -13,7 +13,7 @@ import { Palette } from "lucide-react";
 
 export default function Home() {
   const { toast } = useToast();
-  const queryClient = useQueryClient();
+  const queryClient = useQueryClient(); // Già presente
   const [searchQuery, setSearchQuery] = useState("");
   const [sortBy, setSortBy] = useState<"date" | "name">("date");
   const [isApartmentModalOpen, setIsApartmentModalOpen] = useState(false);
@@ -24,11 +24,13 @@ export default function Home() {
 
   // === INIZIO MODIFICA: Mutazione per salvare il tema ===
   const updateThemeMutation = useMutation({
-    mutationFn: (newColor: string) => 
-      apiRequest('PUT', '/api/users/theme', { color: newColor }),
-    onSuccess: (data) => {
-      // Aggiorna i dati dell'utente in cache con la risposta del server
-      queryClient.setQueryData(['/api/auth/me'], data);
+    mutationFn: (hslColor: string) => 
+      // Usiamo la nuova rotta API
+      apiRequest('PUT', '/api/users/theme', { color: hslColor }),
+    
+    onSuccess: (updatedUser) => {
+      // Aggiorna i dati dell'utente in cache (queryKey /api/auth/me)
+      queryClient.setQueryData(['/api/auth/me'], updatedUser);
     },
     onError: (error) => {
       toast({
@@ -36,7 +38,6 @@ export default function Home() {
         description: `Impossibile salvare il colore: ${error.message}`,
         variant: "destructive",
       });
-      // (Opzionale: ricaricare il vecchio colore da localStorage/cache)
     }
   });
   // === FINE MODIFICA ===
@@ -87,8 +88,7 @@ export default function Home() {
     colorInputRef.current?.click();
   };
 
-  // ... (tutto il resto del file: fetch appartamenti, mutazioni ordini, etc. rimane invariato) ...
-  
+
   // Fetch apartments
   const { data: apartments, isLoading: isLoadingApartments } = useQuery<ApartmentWithAssignedEmployees[]>({
     queryKey: [`/api/apartments?sortBy=${sortBy}${searchQuery ? `&search=${searchQuery}` : ''}`],
@@ -100,6 +100,7 @@ export default function Home() {
   });
 
   // Create apartment mutation
+  // ... (questa mutazione rimane invariata e corretta) ...
   const createApartmentMutation = useMutation({
     mutationFn: (data: ApartmentFormData) => 
       apiRequest('POST', '/api/apartments', data),
@@ -140,6 +141,7 @@ export default function Home() {
   });
 
   // Update apartment mutation
+  // ... (questa mutazione rimane invariata e corretta) ...
   const updateApartmentMutation = useMutation({
     mutationFn: ({ id, data }: { id: number, data: ApartmentFormData }) => 
       apiRequest('PUT', `/api/apartments/${id}`, data),
@@ -180,6 +182,7 @@ export default function Home() {
   });
 
   // Delete apartment mutation
+  // ... (questa mutazione rimane invariata e corretta) ...
   const deleteApartmentMutation = useMutation({
     mutationFn: (id: number) => 
       apiRequest('DELETE', `/api/apartments/${id}`),
@@ -220,6 +223,7 @@ export default function Home() {
   });
 
   // Event handlers
+  // ... (tutto il resto del file rimane invariato) ...
   const handleOpenAddModal = () => {
     setCurrentApartment(undefined);
     setIsApartmentModalOpen(true);

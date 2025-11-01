@@ -1,18 +1,5 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
 
-// === INIZIO MODIFICA ===
-// La 'getQueryFn' è definita più in basso in questo stesso file.
-// La passiamo qui nel costruttore per impostarla come predefinita
-// per tutte le 'useQuery'.
-export const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      queryFn: getQueryFn,
-    },
-  },
-});
-// === FINE MODIFICA ===
-
 /**
  * Gestore centralizzato degli errori per le risposte fetch.
  * Lancia un errore se la risposta non è "ok".
@@ -31,8 +18,10 @@ async function throwIfResNotOk(res: Response) {
 
 /**
  * Funzione generica per le query (GET) usata da useQuery.
+ * === DEVE ESSERE DICHIARATA PRIMA DI queryClient ===
  */
 export const getQueryFn: QueryFunction = async ({ queryKey }) => {
+  // === INIZIO MODIFICA ===
   // queryKey[0] è l'URL base (es. "/api/apartments")
   // queryKey[1] (se esiste) è un oggetto di parametri (es. { sortBy: "name" })
 
@@ -56,10 +45,23 @@ export const getQueryFn: QueryFunction = async ({ queryKey }) => {
 
   // La vecchia versione (queryKey.join('/')) non funzionava con oggetti
   const res = await fetch(url.toString());
+  // === FINE MODIFICA ===
 
   await throwIfResNotOk(res);
   return res.json();
 };
+
+// === MODIFICA CHIAVE ===
+// queryClient viene ora dichiarato DOPO getQueryFn
+// e la imposta come "queryFn" predefinita per l'intera app.
+export const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      queryFn: getQueryFn,
+    },
+  },
+});
+// === FINE MODIFICA ===
 
 /**
  * Funzione helper per richieste API (POST, PUT, DELETE) usata da useMutation.

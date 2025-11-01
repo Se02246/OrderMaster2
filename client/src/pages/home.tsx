@@ -1,7 +1,7 @@
 import { useState, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import ApartmentCard from "@/components/ui/data-display/ApartmentCard";
-import ApartmentModal from "@/components/ui/modals/ApartmentModal";
+import { ApartmentModal } from "@/components/ui/modals/ApartmentModal";
 import ConfirmDeleteModal from "@/components/ui/modals/ConfirmDeleteModal";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";

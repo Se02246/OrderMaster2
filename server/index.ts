@@ -4,6 +4,13 @@ import { setupVite, serveStatic, log } from "./vite";
 import { setupAuth } from "./auth"; // Importa la configurazione auth
 
 const app = express();
+
+// === INIZIO MODIFICA ===
+// Informa Express che si trova dietro un proxy (Render)
+// e di fidarsi delle intestazioni come X-Forwarded-Proto (per HTTPS)
+app.set('trust proxy', 1);
+// === FINE MODIFICA ===
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
@@ -57,11 +64,8 @@ app.use((req, res, next) => {
     serveStatic(app);
   }
 
-  // === MODIFICA CHIAVE ===
   // Usa la porta fornita da Render (process.env.PORT)
-  // o torna a 5000 se non è definita (per lo sviluppo locale)
   const port = process.env.PORT || 5000;
-  // === FINE ===
   
   server.listen({
     port,

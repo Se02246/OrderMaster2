@@ -77,14 +77,10 @@ export const assignmentsRelations = relations(assignments, ({ one }) => ({
 }));
 
 // Insert schemas
-// === INIZIO MODIFICA ===
-// Diciamo a Zod di ignorare 'user_id' durante la validazione dell'input,
-// perché verrà aggiunto dal server.
 export const insertUserSchema = createInsertSchema(users).omit({ id: true });
 export const insertApartmentSchema = createInsertSchema(apartments).omit({ id: true, user_id: true });
 export const insertEmployeeSchema = createInsertSchema(employees).omit({ id: true, user_id: true });
 export const insertAssignmentSchema = createInsertSchema(assignments).omit({ id: true });
-// === FINE MODIFICA ===
 
 // Types
 export type User = typeof users.$inferSelect;
@@ -98,9 +94,15 @@ export type InsertAssignment = z.infer<typeof insertAssignmentSchema>;
 
 // Extended schemas for API operations
 export const apartmentWithEmployeesSchema = z.object({
-  ...insertApartmentSchema.shape, // Ora questo schema non richiede più user_id
+  ...insertApartmentSchema.shape,
   price: z.union([z.string(), z.number()]).optional().nullable(),
-  employee_ids: z.array(z.number()).optional(),
+  
+  // === INIZIO MODIFICA ===
+  // Modifichiamo 'z.number()' in 'z.coerce.number()'.
+  // Questo forzerà Zod a convertire le stringhe (es. "7") in numeri (es. 7)
+  // prima di validare, risolvendo il conflitto string/number.
+  employee_ids: z.array(z.coerce.number()).optional(),
+  // === FINE MODIFICA ===
 });
 
 export type ApartmentWithEmployees = z.infer<typeof apartmentWithEmployeesSchema>;
